@@ -682,8 +682,8 @@ input[type="file"] {
 .aircraft-marker-label .altitude {
   display: block;
   font-size: 10px;
-  color: #0ff;
-  text-shadow: 0 0 6px #0ff, 0 0 2px #000;
+  color: #00ffff;
+  text-shadow: 0 0 6px #00ffff, 0 0 2px #000;
 }
 
 .aircraft-marker-label .indicator {
