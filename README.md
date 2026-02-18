@@ -13,7 +13,7 @@ A web-based system for tracking multiple aircraft in real-time, visualizing thei
 - ⏱️ **Time acceleration** - Control playback speed from 1x to 300x
 - 🎮 **Playback controls** - Play, pause, and reset animations
 - 🌐 **Network accessible** - View from anywhere on your local network
-- 📍 **Crossing point visualization** - See where aircraft paths intersect
+- 📍 **Route visualization** - Color-coded flight paths for each aircraft
 
 ## 📋 Prerequisites
 
