@@ -24,6 +24,16 @@ let activeConflicts = [];
 // Constants
 const DEFAULT_CRUISE_ALTITUDE = 3000;
 const DEFAULT_ARRIVAL_ALTITUDE = 1000;
+const DAY_START_HOUR = 7; // 07:00 UTC
+const DAY_END_HOUR = 22;  // 22:00 UTC
+
+// Helper: format seconds-since-midnight to HH:MM UTC
+function formatTimeOfDay(secondsSinceMidnight) {
+    const s = Math.floor(secondsSinceMidnight || 0);
+    const hh = Math.floor((s % 86400) / 3600).toString().padStart(2, '0');
+    const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+    return `${hh}:${mm} UTC`;
+}
 
 // Airport lookup function
 function getAirportCoordinates(icaoCode) {
@@ -197,7 +207,20 @@ function initializeWebSocket() {
     });
     
     socket.on('simulation-update', (data) => {
-        updateTimeDisplay(data.time);
+        // If server provides numeric simulation time (seconds), sync our slider and currentTime
+        if (typeof data.time === 'number') {
+            // Server time is mission-relative seconds; map to our day-slider by offsetting from DAY_START_HOUR
+            currentTime = data.time;
+            try {
+                const ts = document.getElementById('timeSlider');
+                const tv = document.getElementById('timeValue');
+                if (ts) ts.value = String((DAY_START_HOUR * 3600) + currentTime);
+                if (tv) tv.textContent = formatTimeOfDay((DAY_START_HOUR * 3600) + currentTime);
+            } catch (e) {}
+            updateTimeDisplay();
+        } else {
+            updateTimeDisplay(data.time);
+        }
         updateAircraftPositions(data.aircraft);
         updateConflictAlerts(data.conflicts || []);
         if (showDistanceMatrix) {
@@ -252,6 +275,28 @@ function initializeControls() {
         // Update simulation speed if simulation is running
         socket.emit('set-simulation-speed', { speed: playbackSpeed });
     });
+
+    // Time scrubber (seek)
+    const timeSlider = document.getElementById('timeSlider');
+    const timeValue = document.getElementById('timeValue');
+    if (timeSlider && timeValue) {
+        const dayStartSec = DAY_START_HOUR * 3600;
+        const dayEndSec = DAY_END_HOUR * 3600;
+        // Configure slider as seconds-since-midnight representing a wall-clock time
+        timeSlider.min = String(dayStartSec);
+        timeSlider.max = String(dayEndSec);
+        timeSlider.step = '60'; // 1 minute steps
+
+        timeSlider.addEventListener('input', (e) => {
+            // Slider value is seconds since midnight (time-of-day). Map to mission-relative currentTime.
+            const sliderSec = parseFloat(e.target.value) || dayStartSec;
+            currentTime = sliderSec - dayStartSec; // mission-relative seconds (0 = day start)
+            updateAircraftPositions();
+            updateTimeDisplay();
+            updateAircraftList();
+            timeValue.textContent = formatTimeOfDay(sliderSec);
+        });
+    }
     
     // Initialize speed preset buttons
     const speedButtons = document.querySelectorAll('.speed-btn');
@@ -372,9 +417,26 @@ function initializeMission() {
     // Update aircraft list
     updateAircraftList();
     
-    // Reset time
+    // Reset time (mission-relative seconds)
     currentTime = 0;
     updateTimeDisplay();
+
+    // Configure time slider to cover the day-of-day range (DAY_START_HOUR..DAY_END_HOUR)
+    try {
+        const timeSlider = document.getElementById('timeSlider');
+        const timeValue = document.getElementById('timeValue');
+        const dayStartSec = DAY_START_HOUR * 3600;
+        if (timeSlider) {
+            timeSlider.min = String(dayStartSec);
+            timeSlider.max = String(DAY_END_HOUR * 3600);
+            timeSlider.step = '60';
+            // Position slider to day start (mission-relative 0)
+            timeSlider.value = String(dayStartSec + currentTime);
+        }
+        if (timeValue) timeValue.textContent = formatTimeOfDay(dayStartSec + currentTime);
+    } catch (e) {
+        // ignore if DOM not ready
+    }
 }
 
 // Update aircraft list in info panel
@@ -513,10 +575,20 @@ function play() {
     
     animationInterval = setInterval(() => {
         currentTime += 0.1 * playbackSpeed;
-        
-        // Check if all aircraft have completed their routes
+        // Reflect time on the scrubber (slider holds seconds-since-midnight)
+        try {
+            const ts = document.getElementById('timeSlider');
+            const tv = document.getElementById('timeValue');
+            const dayStartSec = DAY_START_HOUR * 3600;
+            if (ts) ts.value = String(dayStartSec + currentTime);
+            if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
+        } catch (e) {
+            // ignore
+        }
+
+        // Stop if mission route completed or we've passed the configured day end
         const maxTime = Math.max(...missionData.aircraft.map(getMaxTime));
-        if (currentTime >= maxTime) {
+        if (currentTime >= maxTime || (DAY_START_HOUR * 3600 + currentTime) > (DAY_END_HOUR * 3600)) {
             pause();
             return;
         }
@@ -546,12 +618,17 @@ function reset() {
     updateAircraftPositions();
     updateTimeDisplay();
     updateAircraftList();
+    try {
+        const ts = document.getElementById('timeSlider');
+        const tv = document.getElementById('timeValue');
+        const dayStartSec = DAY_START_HOUR * 3600;
+        if (ts) ts.value = String(dayStartSec + currentTime);
+        if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
+    } catch (e) {}
 }
 
 // Update aircraft positions on map
 function updateAircraftPositions(aircraftData) {
-    if (!aircraftData) return;
-    
     // Handle array of aircraft data (for simulation-update)
     if (Array.isArray(aircraftData)) {
         aircraftData.forEach(aircraft => {
@@ -735,7 +812,9 @@ function updateTimeDisplay(time) {
         const timeObj = new Date(time);
         displayEl.textContent = `Time: ${timeObj.toISOString().split('T')[1].slice(0, 8)}`;
     } else {
-        displayEl.textContent = `Time: ${currentTime.toFixed(1)}s`;
+        // Show wall-clock time mapped from mission-relative currentTime
+        const dayStartSec = DAY_START_HOUR * 3600;
+        displayEl.textContent = `Time: ${formatTimeOfDay(dayStartSec + currentTime)}`;
     }
 }
 
