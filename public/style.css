@@ -501,3 +501,130 @@ header h1 {
 .waypoint-mode * {
     cursor: crosshair !important;
 }
+
+/* Conflict Panel */
+.conflict-panel {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #34495e;
+    border-radius: 8px;
+}
+
+.conflict-panel h3 {
+    font-size: 16px;
+    color: #e74c3c;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.badge {
+    display: inline-block;
+    background: #e74c3c;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.conflict-item {
+    background: #2c3e50;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border-left: 4px solid #e74c3c;
+}
+
+.conflict-item.warning {
+    border-left-color: #f39c12;
+}
+
+.conflict-item.critical {
+    border-left-color: #e74c3c;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.conflict-aircraft {
+    font-weight: bold;
+    color: #fff;
+    font-size: 14px;
+}
+
+.conflict-metrics {
+    font-size: 11px;
+    color: #95a5a6;
+    margin-top: 5px;
+}
+
+/* Distance Panel */
+.distance-panel {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #34495e;
+    border-radius: 8px;
+}
+
+.distance-panel h3 {
+    font-size: 16px;
+    color: #3498db;
+    margin-bottom: 10px;
+}
+
+#distance-matrix {
+    margin-top: 10px;
+}
+
+.distance-item {
+    background: #2c3e50;
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+.distance-pair {
+    font-weight: bold;
+    color: #3498db;
+}
+
+.distance-values {
+    color: #95a5a6;
+    margin-top: 3px;
+    font-size: 11px;
+}
+
+/* Altitude Display in Aircraft List */
+.altitude-display {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: #95a5a6;
+    margin-top: 3px;
+}
+
+.altitude-indicator {
+    font-size: 14px;
+}
+
+.climbing { color: #27ae60; }
+.descending { color: #e74c3c; }
+.level { color: #95a5a6; }
+
+.altitude-value {
+    font-weight: bold;
+    color: #3498db;
+}
+
+/* Make aircraft items taller for altitude display */
+.aircraft-card {
+    min-height: 80px;
+    padding: 12px;
+}
