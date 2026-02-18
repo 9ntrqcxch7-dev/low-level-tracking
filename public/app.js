@@ -98,14 +98,10 @@ function initializeWebSocket() {
 
 // Initialize controls
 function initializeControls() {
-    document.getElementById('playBtn').addEventListener('click', play);
-    document.getElementById('pauseBtn').addEventListener('click', pause);
-    document.getElementById('resetBtn').addEventListener('click', reset);
-    
-    // Simulation control handlers
-    document.getElementById('startSimulationBtn').addEventListener('click', startSimulation);
-    document.getElementById('pauseSimulationBtn').addEventListener('click', pauseSimulation);
-    document.getElementById('resetSimulationBtn').addEventListener('click', resetSimulation);
+    // Connect original buttons to simulation engine
+    document.getElementById('playBtn').addEventListener('click', startSimulation);
+    document.getElementById('pauseBtn').addEventListener('click', pauseSimulation);
+    document.getElementById('resetBtn').addEventListener('click', resetSimulation);
     
     const speedControl = document.getElementById('speedControl');
     speedControl.addEventListener('input', (e) => {
@@ -120,20 +116,20 @@ function initializeControls() {
 // Simulation control functions
 function startSimulation() {
     socket.emit('start-simulation', { speed: playbackSpeed });
-    document.getElementById('startSimulationBtn').disabled = true;
-    document.getElementById('pauseSimulationBtn').disabled = false;
+    document.getElementById('playBtn').disabled = true;
+    document.getElementById('pauseBtn').disabled = false;
 }
 
 function pauseSimulation() {
     socket.emit('pause-simulation');
-    document.getElementById('startSimulationBtn').disabled = false;
-    document.getElementById('pauseSimulationBtn').disabled = true;
+    document.getElementById('playBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = true;
 }
 
 function resetSimulation() {
     socket.emit('reset-simulation');
-    document.getElementById('startSimulationBtn').disabled = false;
-    document.getElementById('pauseSimulationBtn').disabled = true;
+    document.getElementById('playBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = true;
 }
 
 // Update connection status indicator
