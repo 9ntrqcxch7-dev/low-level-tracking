@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛩️ Low-Level Aircraft Tracking System</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🛩️ Low-Level Aircraft Tracking System</h1>
+            <p class="subtitle">Real-time Aircraft Low-Level Navigation Tracking</p>
+        </header>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="controls-left">
+                <button id="playBtn" class="btn btn-primary">▶️ Play</button>
+                <button id="pauseBtn" class="btn btn-secondary" disabled>⏸️ Pause</button>
+                <button id="resetBtn" class="btn btn-secondary">🔄 Reset</button>
+            </div>
+            
+            <div class="controls-center">
+                <label for="speedControl">Speed:</label>
+                <input type="range" id="speedControl" min="1" max="300" value="1" step="1">
+                <span id="speedValue">1x</span>
+            </div>
+            
+            <div class="controls-right">
+                <div class="status">
+                    <span id="connectionStatus" class="status-disconnected">⚫ Disconnected</span>
+                    <span id="timeDisplay">Time: 0s</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map"></div>
+
+        <!-- Aircraft Info Panel -->
+        <div class="info-panel">
+            <h3>Active Aircraft</h3>
+            <div id="aircraftList"></div>
+        </div>
+    </div>
+
+    <!-- Socket.io Client -->
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="app.js"></script>
+</body>
+</html>
