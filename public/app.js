@@ -10,6 +10,7 @@ let isPlaying = false;
 let currentTime = 0;
 let playbackSpeed = 1;
 let animationInterval = null;
+let isScrubbing = false;
 
 // Mission Editor State
 let waypointMode = false;
@@ -33,6 +34,45 @@ function formatTimeOfDay(secondsSinceMidnight) {
     const hh = Math.floor((s % 86400) / 3600).toString().padStart(2, '0');
     const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
     return `${hh}:${mm} UTC`;
+}
+
+// Haversine distance (meters) between two lat/lon points
+function haversineMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // meters
+    const toRad = (deg) => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// Compute implicit route times (seconds) for aircraft if not provided on waypoints.
+// Uses aircraft.speed (knots) to estimate durations between waypoints.
+function ensureRouteTimes(aircraft) {
+    if (!aircraft || !aircraft.route || aircraft.route.length === 0) return;
+    // If the first waypoint already has a .time property, assume times exist
+    if (typeof aircraft.route[0].time === 'number') return;
+
+    // Use speed in knots; fallback to 200 kts if missing
+    const speedKts = (aircraft.speed && Number(aircraft.speed) > 0) ? Number(aircraft.speed) : 200;
+
+    // Compute cumulative seconds starting at 0
+    let cumulative = 0;
+    for (let i = 0; i < aircraft.route.length; i++) {
+        if (i === 0) {
+            aircraft.route[i].time = 0;
+            continue;
+        }
+        const prev = aircraft.route[i-1];
+        const cur = aircraft.route[i];
+        const meters = haversineMeters(prev.lat, prev.lon, cur.lat, cur.lon);
+        const nm = meters / 1852; // nautical miles
+        const hours = nm / speedKts;
+        const secs = Math.max(1, Math.round(hours * 3600));
+        cumulative += secs;
+        aircraft.route[i].time = cumulative;
+    }
 }
 
 // Airport lookup function
@@ -207,6 +247,8 @@ function initializeWebSocket() {
     });
     
     socket.on('simulation-update', (data) => {
+        // If the user is actively scrubbing, ignore server updates to avoid fighting the UI
+        if (isScrubbing) return;
         // If server provides numeric simulation time (seconds), sync our slider and currentTime
         if (typeof data.time === 'number') {
             // Server time is mission-relative seconds; map to our day-slider by offsetting from DAY_START_HOUR
@@ -214,7 +256,7 @@ function initializeWebSocket() {
             try {
                 const ts = document.getElementById('timeSlider');
                 const tv = document.getElementById('timeValue');
-                if (ts) ts.value = String((DAY_START_HOUR * 3600) + currentTime);
+                if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + currentTime);
                 if (tv) tv.textContent = formatTimeOfDay((DAY_START_HOUR * 3600) + currentTime);
             } catch (e) {}
             updateTimeDisplay();
@@ -229,7 +271,7 @@ function initializeWebSocket() {
         if (data.separations) {
             updateSeparationMonitor(data.separations);
         }
-        updateAircraftList(data.aircraft);
+        if (!isScrubbing) updateAircraftList(data.aircraft);
     });
     
     socket.on('message-data', (data) => {
@@ -293,9 +335,15 @@ function initializeControls() {
             currentTime = sliderSec - dayStartSec; // mission-relative seconds (0 = day start)
             updateAircraftPositions();
             updateTimeDisplay();
-            updateAircraftList();
+            if (!isScrubbing) updateAircraftList();
             timeValue.textContent = formatTimeOfDay(sliderSec);
         });
+        // Avoid playback/server updates while user is dragging
+        timeSlider.addEventListener('pointerdown', () => { isScrubbing = true; });
+        window.addEventListener('pointerup', () => { if (isScrubbing) { isScrubbing = false; /* commit final position */ const ts = document.getElementById('timeSlider'); if (ts) { const s = parseFloat(ts.value) || dayStartSec; currentTime = s - dayStartSec; updateAircraftPositions(); updateTimeDisplay(); updateAircraftList(); } } });
+        // Touch fallback
+        timeSlider.addEventListener('touchstart', () => { isScrubbing = true; });
+        window.addEventListener('touchend', () => { if (isScrubbing) { isScrubbing = false; const ts = document.getElementById('timeSlider'); if (ts) { const s = parseFloat(ts.value) || dayStartSec; currentTime = s - dayStartSec; updateAircraftPositions(); updateTimeDisplay(); updateAircraftList(); } } });
     }
     
     // Initialize speed preset buttons
@@ -333,7 +381,14 @@ function pauseSimulation() {
 }
 
 function resetSimulation() {
-    socket.emit('reset-simulation');
+    // Tell server to reset simulation and also reset UI immediately
+    try {
+        socket.emit('reset-simulation');
+    } catch (e) {}
+    // Reset local playback state and UI
+    try {
+        reset();
+    } catch (e) {}
     document.getElementById('playBtn').disabled = false;
     document.getElementById('pauseBtn').disabled = true;
 }
@@ -362,6 +417,8 @@ function initializeMission() {
     
     // Create aircraft markers and paths
     missionData.aircraft.forEach(aircraft => {
+        // Ensure route waypoints have time fields (compute from speed/distance if missing)
+        try { ensureRouteTimes(aircraft); } catch (e) { /* ignore */ }
         // Create path polyline
         const routeCoords = aircraft.route.map(point => [point.lat, point.lon]);
         const path = L.polyline(routeCoords, {
@@ -580,7 +637,7 @@ function play() {
             const ts = document.getElementById('timeSlider');
             const tv = document.getElementById('timeValue');
             const dayStartSec = DAY_START_HOUR * 3600;
-            if (ts) ts.value = String(dayStartSec + currentTime);
+            if (ts && !isScrubbing) ts.value = String(dayStartSec + currentTime);
             if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
         } catch (e) {
             // ignore
@@ -595,7 +652,7 @@ function play() {
         
         updateAircraftPositions();
         updateTimeDisplay();
-        updateAircraftList();
+        if (!isScrubbing) updateAircraftList();
     }, 100);
 }
 

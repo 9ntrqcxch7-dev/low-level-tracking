@@ -137,6 +137,19 @@ header h1 {
     font-weight: 600;
 }
 
+/* Reserve space for status to avoid layout shifts when text changes */
+.status {
+    min-width: 220px;
+    justify-content: flex-end;
+}
+
+/* Prevent time value from changing layout while scrubbing */
+.time-scrub #timeValue {
+    min-width: 88px;
+    display: inline-block;
+    text-align: center;
+}
+
 .status-connected {
     color: #4CAF50;
 }
@@ -369,6 +382,14 @@ header h1 {
 .leaflet-popup-content {
     font-size: 14px;
     line-height: 1.6;
+}
+
+.airport-tooltip {
+    background: rgba(0, 51, 204, 0.9) !important;
+    color: #fff !important;
+    padding: 3px 6px !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
 }
 
 .popup-aircraft-info {
