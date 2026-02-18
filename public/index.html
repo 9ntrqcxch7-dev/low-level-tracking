@@ -28,6 +28,12 @@
             </div>
             
             <div class="controls-center">
+                <button id="startSimulationBtn" class="btn btn-success">▶️ Start Simulation</button>
+                <button id="pauseSimulationBtn" class="btn btn-secondary" disabled>⏸️ Pause Simulation</button>
+                <button id="resetSimulationBtn" class="btn btn-secondary">🔄 Reset Simulation</button>
+            </div>
+            
+            <div class="controls-center">
                 <label for="speedControl">Speed:</label>
                 <input type="range" id="speedControl" min="1" max="300" value="1" step="1">
                 <span id="speedValue">1x</span>
@@ -75,6 +81,16 @@
                         <div class="form-group">
                             <label for="aircraftColor">Color:</label>
                             <input type="color" id="aircraftColor" value="#0000ff" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="aircraftDeparture">Departure (IATA):</label>
+                            <input type="text" id="aircraftDeparture" placeholder="e.g., ESSA" maxlength="4" pattern="[A-Z]{4}">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="aircraftArrival">Arrival (IATA):</label>
+                            <input type="text" id="aircraftArrival" placeholder="e.g., ESPA" maxlength="4" pattern="[A-Z]{4}">
                         </div>
                         
                         <!-- Waypoint Controls -->

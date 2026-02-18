@@ -58,6 +58,16 @@ function initializeWebSocket() {
         initializeMission();
     });
     
+    socket.on('simulation-update', (data) => {
+        updateTimeDisplay(data.time);
+        updateAircraftPositions(data.aircraft);
+        updateConflictAlerts(data.conflicts || []);
+        if (showDistanceMatrix) {
+            updateDistanceMatrix(data.distances || []);
+        }
+        updateAircraftList(data.aircraft);
+    });
+    
     socket.on('message-data', (data) => {
         updateAircraftDisplay(data.aircraft);
         
@@ -92,11 +102,38 @@ function initializeControls() {
     document.getElementById('pauseBtn').addEventListener('click', pause);
     document.getElementById('resetBtn').addEventListener('click', reset);
     
+    // Simulation control handlers
+    document.getElementById('startSimulationBtn').addEventListener('click', startSimulation);
+    document.getElementById('pauseSimulationBtn').addEventListener('click', pauseSimulation);
+    document.getElementById('resetSimulationBtn').addEventListener('click', resetSimulation);
+    
     const speedControl = document.getElementById('speedControl');
     speedControl.addEventListener('input', (e) => {
         playbackSpeed = parseInt(e.target.value);
         document.getElementById('speedValue').textContent = `${playbackSpeed}x`;
+        
+        // Update simulation speed if simulation is running
+        socket.emit('set-simulation-speed', { speed: playbackSpeed });
     });
+}
+
+// Simulation control functions
+function startSimulation() {
+    socket.emit('start-simulation', { speed: playbackSpeed });
+    document.getElementById('startSimulationBtn').disabled = true;
+    document.getElementById('pauseSimulationBtn').disabled = false;
+}
+
+function pauseSimulation() {
+    socket.emit('pause-simulation');
+    document.getElementById('startSimulationBtn').disabled = false;
+    document.getElementById('pauseSimulationBtn').disabled = true;
+}
+
+function resetSimulation() {
+    socket.emit('reset-simulation');
+    document.getElementById('startSimulationBtn').disabled = false;
+    document.getElementById('pauseSimulationBtn').disabled = true;
 }
 
 // Update connection status indicator
@@ -173,8 +210,60 @@ function initializeMission() {
 }
 
 // Update aircraft list in info panel
-function updateAircraftList() {
+function updateAircraftList(aircraftArray) {
     const listEl = document.getElementById('aircraftList');
+    
+    // If using simulation-update data
+    if (aircraftArray && Array.isArray(aircraftArray)) {
+        if (aircraftArray.length === 0) {
+            listEl.innerHTML = '<div class="no-aircraft">No active aircraft</div>';
+            return;
+        }
+        
+        listEl.innerHTML = aircraftArray.map(ac => {
+            const status = ac.position?.active ? '✓ Active' : '○ Waiting';
+            
+            // Determine vertical speed indicator
+            let vspeedIndicator = '➡️';
+            let vspeedClass = 'level';
+            if (ac.verticalSpeed > 100) {
+                vspeedIndicator = '🔼';
+                vspeedClass = 'climbing';
+            } else if (ac.verticalSpeed < -100) {
+                vspeedIndicator = '🔽';
+                vspeedClass = 'descending';
+            }
+            
+            const altitudeDisplay = ac.altitude ? `
+                <div class="altitude-display">
+                    <span class="altitude-indicator ${vspeedClass}">${vspeedIndicator}</span>
+                    <span class="altitude-value">${ac.altitude.toLocaleString()} ft</span>
+                    ${Math.abs(ac.verticalSpeed || 0) > 100 ? 
+                      `<span style="font-size: 10px;">(${ac.verticalSpeed > 0 ? '+' : ''}${ac.verticalSpeed} ft/min)</span>` 
+                      : ''}
+                </div>
+            ` : '';
+            
+            return `
+                <div class="aircraft-card">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                            <div class="aircraft-marker" style="background-color: ${ac.color}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #333;"></div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold;">${ac.callsign}</div>
+                                <div style="font-size: 11px; color: #95a5a6;">${status}</div>
+                                ${altitudeDisplay}
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-small" onclick="deleteAircraft('${ac.id}')">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        return;
+    }
+    
+    // Original behavior for legacy mission data
     if (!missionData || !missionData.aircraft) {
         listEl.innerHTML = '<p>No aircraft data available</p>';
         return;
@@ -292,7 +381,127 @@ function reset() {
 }
 
 // Update aircraft positions on map
-function updateAircraftPositions() {
+function updateAircraftPositions(aircraftData) {
+    if (!aircraftData) return;
+    
+    // Handle array of aircraft data (for simulation-update)
+    if (Array.isArray(aircraftData)) {
+        aircraftData.forEach(aircraft => {
+            if (!aircraft.position || !aircraft.position.active) return;
+
+            const { lat, lon } = aircraft.position;
+            const key = aircraft.id;
+
+            // Create or update marker
+            if (!aircraftMarkers[key]) {
+                // Create custom icon
+                const icon = L.divIcon({
+                    className: 'aircraft-marker-icon',
+                    html: `
+                      <div class="aircraft-icon" style="transform: rotate(${aircraft.heading || 0}deg)">
+                        ✈️
+                      </div>
+                    `,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+
+                const marker = L.marker([lat, lon], { icon: icon }).addTo(map);
+
+                // Create popup content
+                const popupContent = `
+                    <div class="aircraft-popup">
+                      <div class="popup-header" style="background-color: ${aircraft.color}">
+                        <strong>${aircraft.callsign}</strong>
+                      </div>
+                      <div class="popup-body">
+                        <div class="popup-row">
+                          <span class="popup-label">Altitude:</span>
+                          <span class="popup-value">${aircraft.altitude?.toLocaleString() || 0} ft</span>
+                        </div>
+                        <div class="popup-row">
+                          <span class="popup-label">Speed:</span>
+                          <span class="popup-value">${aircraft.speed || 0} kts</span>
+                        </div>
+                        <div class="popup-row">
+                          <span class="popup-label">Heading:</span>
+                          <span class="popup-value">${aircraft.heading || 0}°</span>
+                        </div>
+                        ${aircraft.departure ? `
+                        <div class="popup-row">
+                          <span class="popup-label">From:</span>
+                          <span class="popup-value">${aircraft.departure}</span>
+                        </div>
+                        ` : ''}
+                        ${aircraft.arrival ? `
+                        <div class="popup-row">
+                          <span class="popup-label">To:</span>
+                          <span class="popup-value">${aircraft.arrival}</span>
+                        </div>
+                        ` : ''}
+                      </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.on('click', () => marker.openPopup());
+
+                aircraftMarkers[key] = marker;
+            } else {
+                // Update existing marker
+                aircraftMarkers[key].setLatLng([lat, lon]);
+                
+                // Update icon rotation
+                const iconEl = aircraftMarkers[key].getElement();
+                if (iconEl) {
+                    const aircraftIcon = iconEl.querySelector('.aircraft-icon');
+                    if (aircraftIcon) {
+                        aircraftIcon.style.transform = `rotate(${aircraft.heading || 0}deg)`;
+                    }
+                }
+
+                // Update popup content
+                const popupContent = `
+                    <div class="aircraft-popup">
+                      <div class="popup-header" style="background-color: ${aircraft.color}">
+                        <strong>${aircraft.callsign}</strong>
+                      </div>
+                      <div class="popup-body">
+                        <div class="popup-row">
+                          <span class="popup-label">Altitude:</span>
+                          <span class="popup-value">${aircraft.altitude?.toLocaleString() || 0} ft</span>
+                        </div>
+                        <div class="popup-row">
+                          <span class="popup-label">Speed:</span>
+                          <span class="popup-value">${aircraft.speed || 0} kts</span>
+                        </div>
+                        <div class="popup-row">
+                          <span class="popup-label">Heading:</span>
+                          <span class="popup-value">${aircraft.heading || 0}°</span>
+                        </div>
+                        ${aircraft.departure ? `
+                        <div class="popup-row">
+                          <span class="popup-label">From:</span>
+                          <span class="popup-value">${aircraft.departure}</span>
+                        </div>
+                        ` : ''}
+                        ${aircraft.arrival ? `
+                        <div class="popup-row">
+                          <span class="popup-label">To:</span>
+                          <span class="popup-value">${aircraft.arrival}</span>
+                        </div>
+                        ` : ''}
+                      </div>
+                    </div>
+                `;
+
+                aircraftMarkers[key].setPopupContent(popupContent);
+            }
+        });
+        return;
+    }
+    
+    // Original behavior for legacy code
     if (!missionData) return;
     
     missionData.aircraft.forEach(aircraft => {
@@ -314,8 +523,15 @@ function updateAircraftPositions() {
 }
 
 // Update time display
-function updateTimeDisplay() {
-    document.getElementById('timeDisplay').textContent = `Time: ${currentTime.toFixed(1)}s`;
+function updateTimeDisplay(time) {
+    const displayEl = document.getElementById('timeDisplay');
+    if (time) {
+        // If time is an ISO string from simulation
+        const timeObj = new Date(time);
+        displayEl.textContent = `Time: ${timeObj.toISOString().split('T')[1].slice(0, 8)}`;
+    } else {
+        displayEl.textContent = `Time: ${currentTime.toFixed(1)}s`;
+    }
 }
 
 // ============================================
@@ -504,7 +720,10 @@ function handleMapClick(e) {
     if (!waypointMode) return;
     
     const { lat, lng } = e.latlng;
-    tempWaypoints.push({ lat, lng });
+    const altitude = prompt('Enter altitude for this waypoint (feet):', '3000');
+    const alt = parseInt(altitude) || 3000;
+    
+    tempWaypoints.push({ lat, lng, alt });
     
     // Add temporary marker (yellow circle)
     const marker = L.circleMarker([lat, lng], {
@@ -516,7 +735,7 @@ function handleMapClick(e) {
         fillOpacity: 0.8
     }).addTo(map);
     
-    marker.bindPopup(`Waypoint ${tempWaypoints.length}<br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}`);
+    marker.bindPopup(`Waypoint ${tempWaypoints.length}<br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>${alt} ft`);
     tempWaypointMarkers.push(marker);
     
     updateWaypointDisplay();
@@ -537,7 +756,7 @@ function updateWaypointDisplay() {
     waypointList.innerHTML = tempWaypoints.map((wp, index) => `
         <div class="waypoint-item">
             <span class="waypoint-coords">
-                ${index + 1}. Lat: ${wp.lat.toFixed(4)}, Lng: ${wp.lng.toFixed(4)}
+                ${index + 1}. Lat: ${wp.lat.toFixed(4)}, Lng: ${wp.lng.toFixed(4)} - ${wp.alt || 3000} ft
             </span>
             <button class="waypoint-remove" onclick="removeWaypoint(${index})">Remove</button>
         </div>
@@ -583,6 +802,8 @@ function handleAddAircraft(e) {
     const speed = parseInt(document.getElementById('aircraftSpeed').value);
     const startTime = document.getElementById('aircraftStartTime').value;
     const color = document.getElementById('aircraftColor').value;
+    const departure = document.getElementById('aircraftDeparture').value.toUpperCase();
+    const arrival = document.getElementById('aircraftArrival').value.toUpperCase();
     
     // Create aircraft object
     aircraftCounter++;
@@ -590,9 +811,11 @@ function handleAddAircraft(e) {
         id: `AC${aircraftCounter}`,
         callsign: callsign,
         speed: speed,
-        startTime: `2026-01-01T${startTime}:00Z`,
+        startTime: `2024-01-01T${startTime}:00Z`,
         color: color,
-        route: tempWaypoints.map(wp => ({ lat: wp.lat, lng: wp.lng }))
+        departure: departure,
+        arrival: arrival,
+        route: tempWaypoints.map(wp => ({ lat: wp.lat, lng: wp.lng, alt: wp.alt || 3000 }))
     };
     
     // Send to server
