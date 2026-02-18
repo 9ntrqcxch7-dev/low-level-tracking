@@ -433,10 +433,16 @@ function initializeMission() {
         const startPos = aircraft.route[0];
         const marker = L.marker([startPos.lat, startPos.lon], {
             icon: L.divIcon({
-                html: `<div style="background-color: ${aircraft.color}; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-                className: 'aircraft-marker',
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
+                                html: `
+                                    <div style="position: relative; width: 80px; margin-left: -25px; margin-top: -30px;">
+                                        <div class="aircraft-marker-label callsign">${aircraft.callsign}</div>
+                                        <div class="aircraft-icon" style="width:0;height:0;margin:0 auto;transform: rotate(${aircraft.heading || 0}deg);border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:18px solid ${aircraft.color};"></div>
+                                        <div class="aircraft-marker-label altitude">FL${String(Math.round(startPos.alt/100)).padStart(3,'0')}</div>
+                                    </div>
+                                `,
+                                className: 'aircraft-marker',
+                                iconSize: [80, 60],
+                                iconAnchor: [40, 30]
             })
         }).addTo(map);
         
