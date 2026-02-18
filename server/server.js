@@ -428,11 +428,14 @@ io.on('connection', (socket) => {
         callsign: ac.callsign,
         type: ac.type || 'Custom',
         color: ac.color,
+        speed: ac.speed || 250,
+        startTime: ac.startTime || simulationTime.toISOString(),
+        departure: ac.departure || '',
+        arrival: ac.arrival || '',
         route: ac.route.map((point, index) => ({
           lat: point.lat,
           lon: point.lng || point.lon,
-          alt: point.alt || 300,
-          time: index * 30
+          alt: point.alt || 3000
         }))
       }));
       
