@@ -75,6 +75,9 @@ function initializeWebSocket() {
         if (showDistanceMatrix) {
             updateDistanceMatrix(data.distances || []);
         }
+        if (data.separations) {
+            updateSeparationMonitor(data.separations);
+        }
         updateAircraftList(data.aircraft);
     });
     
@@ -120,6 +123,26 @@ function initializeControls() {
         
         // Update simulation speed if simulation is running
         socket.emit('set-simulation-speed', { speed: playbackSpeed });
+    });
+    
+    // Initialize speed preset buttons
+    const speedButtons = document.querySelectorAll('.speed-btn');
+    speedButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const speed = parseFloat(e.target.dataset.speed);
+            
+            // Update speed
+            playbackSpeed = speed;
+            document.getElementById('speedValue').textContent = `${speed}x`;
+            document.getElementById('speedControl').value = Math.round(speed);
+            
+            // Update active button
+            speedButtons.forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            
+            // Update simulation speed if simulation is running
+            socket.emit('set-simulation-speed', { speed: playbackSpeed });
+        });
     });
 }
 
@@ -400,16 +423,32 @@ function updateAircraftPositions(aircraftData) {
 
             // Create or update marker
             if (!aircraftMarkers[key]) {
-                // Create custom icon
+                // Determine vertical speed indicator
+                let vspeedIndicator = '►';
+                if (aircraft.verticalSpeed > 100) {
+                    vspeedIndicator = '▲';
+                } else if (aircraft.verticalSpeed < -100) {
+                    vspeedIndicator = '▼';
+                }
+                
+                // Create altitude display
+                const flightLevel = Math.round(aircraft.altitude / 100);
+                const altDisplay = `FL${String(flightLevel).padStart(3, '0')}`;
+                
+                // Create custom icon with altitude label
                 const icon = L.divIcon({
                     className: 'aircraft-marker-icon',
                     html: `
-                      <div class="aircraft-icon" style="transform: rotate(${aircraft.heading || 0}deg)">
-                        ✈️
+                      <div style="position: relative; width: 80px; margin-left: -25px; margin-top: -30px;">
+                        <div class="aircraft-marker-label callsign">${aircraft.callsign}</div>
+                        <div class="aircraft-icon" style="transform: rotate(${aircraft.heading || 0}deg); text-align: center; font-size: 24px;">
+                          ✈️
+                        </div>
+                        <div class="aircraft-marker-label altitude">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
                       </div>
                     `,
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
+                    iconSize: [80, 60],
+                    iconAnchor: [40, 30]
                 });
 
                 const marker = L.marker([lat, lon], { icon: icon }).addTo(map);
@@ -457,14 +496,35 @@ function updateAircraftPositions(aircraftData) {
                 // Update existing marker
                 aircraftMarkers[key].setLatLng([lat, lon]);
                 
-                // Update icon rotation
-                const iconEl = aircraftMarkers[key].getElement();
-                if (iconEl) {
-                    const aircraftIcon = iconEl.querySelector('.aircraft-icon');
-                    if (aircraftIcon) {
-                        aircraftIcon.style.transform = `rotate(${aircraft.heading || 0}deg)`;
-                    }
+                // Determine vertical speed indicator
+                let vspeedIndicator = '►';
+                if (aircraft.verticalSpeed > 100) {
+                    vspeedIndicator = '▲';
+                } else if (aircraft.verticalSpeed < -100) {
+                    vspeedIndicator = '▼';
                 }
+                
+                // Create altitude display
+                const flightLevel = Math.round(aircraft.altitude / 100);
+                const altDisplay = `FL${String(flightLevel).padStart(3, '0')}`;
+                
+                // Update icon with new altitude and heading
+                const icon = L.divIcon({
+                    className: 'aircraft-marker-icon',
+                    html: `
+                      <div style="position: relative; width: 80px; margin-left: -25px; margin-top: -30px;">
+                        <div class="aircraft-marker-label callsign">${aircraft.callsign}</div>
+                        <div class="aircraft-icon" style="transform: rotate(${aircraft.heading || 0}deg); text-align: center; font-size: 24px;">
+                          ✈️
+                        </div>
+                        <div class="aircraft-marker-label altitude">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
+                      </div>
+                    `,
+                    iconSize: [80, 60],
+                    iconAnchor: [40, 30]
+                });
+                
+                aircraftMarkers[key].setIcon(icon);
 
                 // Update popup content
                 const popupContent = `
@@ -593,6 +653,78 @@ function updateDistanceMatrix(distances) {
             </div>
         </div>
     `).join('');
+}
+
+// Update separation monitor panel
+function updateSeparationMonitor(separations) {
+    if (!separations || separations.length === 0) return;
+    
+    const closestPairEl = document.getElementById('closest-pair-display');
+    const allPairsEl = document.getElementById('all-pairs-list');
+    
+    if (!closestPairEl || !allPairsEl) return;
+    
+    // Find closest pair
+    const closest = separations[0]; // Assuming server sends sorted by distance
+    
+    // Determine status
+    let statusClass = 'safe';
+    let statusIcon = '🟢';
+    let statusText = 'SAFE';
+    
+    if (closest.horizontal < 3 && closest.vertical < 500) {
+        statusClass = 'conflict';
+        statusIcon = '🔴';
+        statusText = 'CONFLICT';
+    } else if (closest.horizontal < 5 && closest.vertical < 1000) {
+        statusClass = 'caution';
+        statusIcon = '🟡';
+        statusText = 'CAUTION';
+    }
+    
+    // Display closest pair
+    closestPairEl.innerHTML = `
+        <div class="closest-pair ${statusClass}">
+            <div class="pair-aircraft">
+                Closest Pair: ${closest.aircraft1} ↔ ${closest.aircraft2}
+            </div>
+            <div class="pair-metrics">
+                <div><span class="metric-label">Horizontal:</span> ${closest.horizontal.toFixed(2)} NM ${statusIcon} ${statusText}</div>
+                <div><span class="metric-label">Vertical:</span> ${closest.vertical.toFixed(0)} ft ${statusIcon} ${statusText}</div>
+                <div><span class="metric-label">Relative Speed:</span> ${closest.relativeSpeed ? closest.relativeSpeed.toFixed(0) : 'N/A'} kts</div>
+                ${closest.timeToCPA ? `<div><span class="metric-label">Time to CPA:</span> ${formatTime(closest.timeToCPA)}</div>` : ''}
+            </div>
+        </div>
+    `;
+    
+    // Display all pairs
+    allPairsEl.innerHTML = separations.map(sep => {
+        let statusClass = 'safe';
+        let statusIcon = '🟢';
+        
+        if (sep.horizontal < 3 && sep.vertical < 500) {
+            statusClass = 'conflict';
+            statusIcon = '🔴';
+        } else if (sep.horizontal < 5 && sep.vertical < 1000) {
+            statusClass = 'caution';
+            statusIcon = '🟡';
+        }
+        
+        return `
+            <div class="pair-item ${statusClass}">
+                <span class="pair-names">${sep.aircraft1} ↔ ${sep.aircraft2}</span>
+                <span class="pair-sep">${sep.horizontal.toFixed(1)} NM | ${sep.vertical.toFixed(0)} ft</span>
+                <span class="status-indicator">${statusIcon}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Format time in seconds to MM:SS format
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
 // Update aircraft display with altitude info
