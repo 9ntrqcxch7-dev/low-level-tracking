@@ -15,6 +15,10 @@ let tempWaypoints = [];
 let tempWaypointMarkers = [];
 let aircraftCounter = 0;
 
+// Conflict and Distance state
+let showDistanceMatrix = false;
+let activeConflicts = [];
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     initializeMap();
@@ -52,6 +56,22 @@ function initializeWebSocket() {
         console.log('Received mission data:', data);
         missionData = data;
         initializeMission();
+    });
+    
+    socket.on('message-data', (data) => {
+        updateAircraftDisplay(data.aircraft);
+        
+        // Update conflicts if present
+        if (data.conflicts) {
+            updateConflictAlerts(data.conflicts);
+        }
+        
+        // Update distances if present
+        if (data.distances) {
+            if (showDistanceMatrix) {
+                updateDistanceMatrix(data.distances);
+            }
+        }
     });
     
     // Handle mission editor responses
@@ -299,6 +319,113 @@ function updateTimeDisplay() {
 }
 
 // ============================================
+// CONFLICT AND DISTANCE FUNCTIONS
+// ============================================
+
+// Update conflict alerts
+function updateConflictAlerts(conflicts) {
+    activeConflicts = conflicts;
+    const countEl = document.getElementById('conflict-count');
+    const listEl = document.getElementById('conflict-list');
+    
+    if (!countEl || !listEl) return;
+    
+    countEl.textContent = conflicts.length;
+    countEl.style.display = conflicts.length > 0 ? 'inline-block' : 'none';
+    
+    if (conflicts.length === 0) {
+        listEl.innerHTML = '<div style="color: #27ae60; font-size: 12px;">✓ No conflicts detected</div>';
+        return;
+    }
+    
+    listEl.innerHTML = conflicts.map(c => `
+        <div class="conflict-item ${c.severity.toLowerCase()}">
+            <div class="conflict-aircraft">
+                ${c.severity === 'CRITICAL' ? '🔴' : '🟡'} 
+                ${c.aircraft1.callsign} vs ${c.aircraft2.callsign}
+            </div>
+            <div class="conflict-metrics">
+                H: ${c.horizontalDistance} NM | V: ${c.verticalSeparation} ft
+            </div>
+        </div>
+    `).join('');
+}
+
+// Update distance matrix
+function updateDistanceMatrix(distances) {
+    const matrixEl = document.getElementById('distance-matrix');
+    if (!matrixEl) return;
+    
+    if (distances.length === 0) {
+        matrixEl.innerHTML = '<div style="color: #95a5a6; font-size: 12px;">No active aircraft pairs</div>';
+        return;
+    }
+    
+    matrixEl.innerHTML = distances.map(d => `
+        <div class="distance-item">
+            <div class="distance-pair">
+                ${d.aircraft1.callsign} ↔ ${d.aircraft2.callsign}
+            </div>
+            <div class="distance-values">
+                Horiz: ${d.horizontal} NM | Vert: ${d.vertical} ft | Total: ${d.total} NM
+            </div>
+        </div>
+    `).join('');
+}
+
+// Update aircraft display with altitude info
+function updateAircraftDisplay(aircraft) {
+    const listEl = document.getElementById('aircraftList');
+    if (!listEl) return;
+    
+    if (aircraft.length === 0) {
+        listEl.innerHTML = '<div class="no-aircraft">No active aircraft</div>';
+        return;
+    }
+    
+    listEl.innerHTML = aircraft.map(ac => {
+        const status = ac.position?.active ? '✓ Active' : '○ Waiting';
+        
+        // Determine vertical speed indicator
+        let vspeedIndicator = '➡️';
+        let vspeedClass = 'level';
+        if (ac.verticalSpeed > 100) {
+            vspeedIndicator = '🔼';
+            vspeedClass = 'climbing';
+        } else if (ac.verticalSpeed < -100) {
+            vspeedIndicator = '🔽';
+            vspeedClass = 'descending';
+        }
+        
+        const altitudeDisplay = ac.altitude ? `
+            <div class="altitude-display">
+                <span class="altitude-indicator ${vspeedClass}">${vspeedIndicator}</span>
+                <span class="altitude-value">${ac.altitude.toLocaleString()} ft</span>
+                ${Math.abs(ac.verticalSpeed || 0) > 100 ? 
+                  `<span style="font-size: 10px;">(${ac.verticalSpeed > 0 ? '+' : ''}${ac.verticalSpeed} ft/min)</span>` 
+                  : ''}
+            </div>
+        ` : '';
+        
+        return `
+            <div class="aircraft-card">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                        <div class="aircraft-marker" style="background-color: ${ac.color}"></div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold;">${ac.callsign}</div>
+                            <div style="font-size: 11px; color: #95a5a6;">${status}</div>
+                            ${altitudeDisplay}
+                        </div>
+                    </div>
+                    <button class="btn btn-danger btn-small" onclick="deleteAircraft('${ac.id}')">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ============================================
 // MISSION EDITOR FUNCTIONS
 // ============================================
 
@@ -336,6 +463,18 @@ function initializeMissionEditor() {
     });
     document.getElementById('missionFileInput').addEventListener('change', handleLoadMission);
     document.getElementById('clearAllBtn').addEventListener('click', clearAllAircraft);
+    
+    // Initialize distance matrix toggle
+    document.getElementById('toggle-distances-btn')?.addEventListener('click', () => {
+        showDistanceMatrix = !showDistanceMatrix;
+        const matrixEl = document.getElementById('distance-matrix');
+        const btn = document.getElementById('toggle-distances-btn');
+        
+        if (matrixEl && btn) {
+            matrixEl.style.display = showDistanceMatrix ? 'block' : 'none';
+            btn.textContent = showDistanceMatrix ? 'Hide Matrix' : 'Show Matrix';
+        }
+    });
 }
 
 // Toggle waypoint click mode
