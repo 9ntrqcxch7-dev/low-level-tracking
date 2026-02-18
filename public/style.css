@@ -410,7 +410,8 @@ header h1 {
 .mission-editor {
     background: white;
     border-radius: 12px;
-    margin-bottom: 25px;
+    margin: 0 auto 25px auto;
+    max-width: 800px;
     padding: 0;
     overflow: hidden;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
