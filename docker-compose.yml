@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  tracking-server:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./missions:/app/missions
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    container_name: aircraft-tracking
