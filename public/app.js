@@ -19,6 +19,10 @@ let aircraftCounter = 0;
 let showDistanceMatrix = false;
 let activeConflicts = [];
 
+// Constants
+const DEFAULT_CRUISE_ALTITUDE = 3000;
+const DEFAULT_ARRIVAL_ALTITUDE = 1000;
+
 // Airport lookup function
 function getAirportCoordinates(icaoCode) {
     const code = icaoCode.toUpperCase().trim();
@@ -818,7 +822,7 @@ function handleAddAircraft(e) {
         completeRoute.push({
             lat: departureAirport.lat,
             lng: departureAirport.lon,
-            alt: 3000
+            alt: DEFAULT_CRUISE_ALTITUDE
         });
     }
     
@@ -826,7 +830,7 @@ function handleAddAircraft(e) {
     completeRoute.push(...tempWaypoints.map(wp => ({
         lat: wp.lat,
         lng: wp.lng,
-        alt: wp.alt || 3000
+        alt: wp.alt || DEFAULT_CRUISE_ALTITUDE
     })));
     
     // Add arrival airport as last waypoint (if provided)
@@ -839,7 +843,7 @@ function handleAddAircraft(e) {
         completeRoute.push({
             lat: arrivalAirport.lat,
             lng: arrivalAirport.lon,
-            alt: 1000
+            alt: DEFAULT_ARRIVAL_ALTITUDE
         });
     }
     
