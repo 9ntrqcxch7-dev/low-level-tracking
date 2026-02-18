@@ -628,3 +628,57 @@ header h1 {
     min-height: 80px;
     padding: 12px;
 }
+
+/* Aircraft Marker Icon */
+.aircraft-marker-icon {
+  background: transparent;
+  border: none;
+}
+
+.aircraft-icon {
+  font-size: 24px;
+  transition: transform 0.3s ease;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+/* Aircraft Popup */
+.aircraft-popup {
+  min-width: 200px;
+  font-family: Arial, sans-serif;
+}
+
+.popup-header {
+  padding: 8px 12px;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 4px 4px 0 0;
+  text-align: center;
+}
+
+.popup-body {
+  padding: 10px;
+  background: white;
+}
+
+.popup-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.popup-row:last-child {
+  border-bottom: none;
+}
+
+.popup-label {
+  font-weight: bold;
+  color: #666;
+  font-size: 12px;
+}
+
+.popup-value {
+  color: #333;
+  font-size: 12px;
+}
