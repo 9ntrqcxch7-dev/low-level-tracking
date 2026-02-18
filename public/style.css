@@ -157,29 +157,44 @@ header h1 {
 .info-panel {
     background: white;
     border-radius: 12px;
-    padding: 25px;
+    padding: 20px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 .info-panel h3 {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     color: #1e3c72;
-    font-size: 1.4em;
+    font-size: 1.2em;
     font-weight: 700;
     border-bottom: 3px solid #2196F3;
-    padding-bottom: 12px;
+    padding-bottom: 10px;
+}
+
+/* Two-column layout for mission editor and aircraft list */
+.editor-aircraft-layout {
+    display: grid;
+    grid-template-columns: 450px 1fr;
+    gap: 25px;
+    align-items: start;
+    margin-bottom: 25px;
+}
+
+@media (max-width: 1200px) {
+    .editor-aircraft-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
 #aircraftList {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 16px;
+    grid-template-columns: 1fr;
+    gap: 12px;
 }
 
 .aircraft-card {
     border: 2px solid #e3f2fd;
-    border-radius: 10px;
-    padding: 18px;
+    border-radius: 8px;
+    padding: 12px;
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -205,8 +220,8 @@ header h1 {
 }
 
 .aircraft-color {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     border: 3px solid white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -222,21 +237,21 @@ header h1 {
 
 .aircraft-callsign {
     font-weight: 700;
-    font-size: 1.15em;
+    font-size: 1em;
     color: #1e3c72;
 }
 
 .aircraft-type {
     color: #78909c;
-    font-size: 0.9em;
+    font-size: 0.8em;
     font-weight: 500;
 }
 
 .aircraft-info {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 8px 12px;
-    font-size: 0.9em;
+    gap: 6px 10px;
+    font-size: 0.85em;
 }
 
 .aircraft-info .label {
@@ -410,8 +425,8 @@ header h1 {
 .mission-editor {
     background: white;
     border-radius: 12px;
-    margin: 0 auto 25px auto;
-    max-width: 800px;
+    margin: 0;
+    max-width: none;
     padding: 0;
     overflow: hidden;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
@@ -420,13 +435,13 @@ header h1 {
 .editor-header {
     color: #1e3c72;
     background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-    padding: 18px 25px;
+    padding: 12px 15px;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-weight: 700;
-    font-size: 1.2em;
+    font-size: 1.1em;
     border-bottom: 2px solid #2196F3;
 }
 
@@ -444,7 +459,7 @@ header h1 {
 }
 
 .editor-content {
-    padding: 25px;
+    padding: 15px;
 }
 
 .editor-content.hidden {
@@ -463,24 +478,24 @@ header h1 {
 }
 
 .form-group {
-    margin-bottom: 18px;
+    margin-bottom: 12px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     color: #546e7a;
     font-weight: 600;
-    font-size: 0.95em;
+    font-size: 0.85em;
 }
 
 .form-group input,
 .form-group select {
     width: 100%;
-    padding: 10px 14px;
+    padding: 8px 10px;
     border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 14px;
+    border-radius: 6px;
+    font-size: 13px;
     transition: all 0.3s ease;
     background: white;
 }
@@ -500,27 +515,27 @@ header h1 {
 
 .waypoint-controls {
     display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
+    gap: 8px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
 }
 
 .waypoint-list {
     background: #f8f9fa;
-    border-radius: 8px;
-    padding: 15px;
-    min-height: 100px;
+    border-radius: 6px;
+    padding: 10px;
+    min-height: 80px;
 }
 
 .waypoint-item {
     background: white;
-    padding: 10px 14px;
-    border-radius: 6px;
-    margin-bottom: 8px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-bottom: 6px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .waypoint-coords {
@@ -546,16 +561,22 @@ header h1 {
 
 .mission-actions {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-    margin-top: 20px;
-    padding-top: 20px;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 15px;
+    padding-top: 15px;
     border-top: 2px solid #eceff1;
 }
 
 .mission-actions h4 {
-    grid-column: 1 / -1;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    font-size: 0.95em;
+}
+
+.mission-actions .btn {
+    width: 100%;
+    padding: 8px 16px;
+    font-size: 13px;
 }
 
 .aircraft-form-actions {

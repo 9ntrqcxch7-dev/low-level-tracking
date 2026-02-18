@@ -54,8 +54,8 @@
         <!-- Map Container -->
         <div id="map"></div>
 
-        <!-- Aircraft Info Panel -->
-        <div class="info-panel">
+        <!-- Two-Column Layout: Mission Editor + Aircraft List -->
+        <div class="editor-aircraft-layout">
             <!-- Mission Editor Section -->
             <div class="mission-editor">
                 <h3 class="editor-header" id="editorToggle">
@@ -129,6 +129,13 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Aircraft Info Panel -->
+            <div class="info-panel">
+                <h3>Active Aircraft</h3>
+                <div id="aircraftList"></div>
+            </div>
+        </div>
             
             <!-- Conflict Alerts Panel -->
             <div id="conflict-panel" class="conflict-panel">
@@ -152,10 +159,6 @@
                     <div id="all-pairs-list"></div>
                 </div>
             </div>
-            
-            <h3>Active Aircraft</h3>
-            <div id="aircraftList"></div>
-        </div>
     </div>
 
     <!-- Socket.io Client -->
