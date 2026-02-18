@@ -258,3 +258,246 @@ header h1 {
 .popup-aircraft-info p {
     margin: 4px 0;
 }
+
+/* Mission Editor Styles */
+.mission-editor {
+    background: #34495e;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.editor-header {
+    color: white;
+    padding: 15px 20px;
+    margin: 0;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.editor-header:hover {
+    background: #3d566e;
+}
+
+.toggle-icon {
+    transition: transform 0.3s ease;
+}
+
+.toggle-icon.collapsed {
+    transform: rotate(-90deg);
+}
+
+.editor-content {
+    padding: 20px;
+    background: white;
+}
+
+.editor-content.hidden {
+    display: none;
+}
+
+/* Aircraft Form */
+.aircraft-form {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #ddd;
+}
+
+.aircraft-form h4 {
+    margin-bottom: 15px;
+    color: #34495e;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="time"] {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.form-group input[type="color"] {
+    width: 60px;
+    height: 40px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Waypoint Controls */
+.waypoint-controls {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
+
+.waypoint-controls h5 {
+    margin-bottom: 10px;
+    color: #34495e;
+}
+
+.waypoint-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.waypoint-list {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+.waypoint-item {
+    background: white;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid #ddd;
+}
+
+.waypoint-coords {
+    font-size: 0.9em;
+    color: #555;
+}
+
+.waypoint-remove {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+
+.waypoint-remove:hover {
+    background: #d32f2f;
+}
+
+/* Button Styles */
+.btn-info {
+    background: #2196F3;
+    color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+    background: #0b7dda;
+}
+
+.btn-info.active {
+    background: #0b7dda;
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.3);
+}
+
+.btn-success {
+    background: #4CAF50;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #45a049;
+}
+
+.btn-danger {
+    background: #f44336;
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #d32f2f;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+/* Mission Actions */
+.mission-actions {
+    margin-top: 20px;
+}
+
+.mission-actions h4 {
+    margin-bottom: 15px;
+    color: #34495e;
+}
+
+.mission-actions button {
+    margin-right: 10px;
+    margin-bottom: 10px;
+}
+
+/* Aircraft Actions */
+.aircraft-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.icon-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.icon-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-edit {
+    background: #FFC107;
+    color: #333;
+}
+
+.btn-edit:hover {
+    background: #FFB300;
+}
+
+.btn-delete {
+    background: #f44336;
+    color: white;
+}
+
+.btn-delete:hover {
+    background: #d32f2f;
+}
+
+/* Waypoint Mode Cursor */
+.waypoint-mode {
+    cursor: crosshair !important;
+}
+
+.waypoint-mode * {
+    cursor: crosshair !important;
+}

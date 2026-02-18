@@ -46,6 +46,65 @@
 
         <!-- Aircraft Info Panel -->
         <div class="info-panel">
+            <!-- Mission Editor Section -->
+            <div class="mission-editor">
+                <h3 class="editor-header" id="editorToggle">
+                    🎯 Mission Editor
+                    <span class="toggle-icon">▼</span>
+                </h3>
+                <div class="editor-content" id="editorContent">
+                    <!-- Add Aircraft Form -->
+                    <form id="addAircraftForm" class="aircraft-form">
+                        <h4>Add Custom Aircraft</h4>
+                        
+                        <div class="form-group">
+                            <label for="aircraftCallsign">Callsign:</label>
+                            <input type="text" id="aircraftCallsign" required placeholder="e.g., CUSTOM-1">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="aircraftSpeed">Speed (knots):</label>
+                            <input type="number" id="aircraftSpeed" min="50" max="600" value="250" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="aircraftStartTime">Start Time:</label>
+                            <input type="time" id="aircraftStartTime" value="07:00" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="aircraftColor">Color:</label>
+                            <input type="color" id="aircraftColor" value="#0000ff" required>
+                        </div>
+                        
+                        <!-- Waypoint Controls -->
+                        <div class="waypoint-controls">
+                            <h5>Waypoints <span id="waypointCount">(0)</span></h5>
+                            <div class="waypoint-buttons">
+                                <button type="button" id="addWaypointBtn" class="btn btn-info">
+                                    📍 Click Map to Add
+                                </button>
+                                <button type="button" id="clearWaypointsBtn" class="btn btn-secondary btn-small">
+                                    Clear Waypoints
+                                </button>
+                            </div>
+                            <div id="waypointList" class="waypoint-list"></div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success">➕ Add Aircraft</button>
+                    </form>
+                    
+                    <!-- Mission Actions -->
+                    <div class="mission-actions">
+                        <h4>Mission Actions</h4>
+                        <button id="saveMissionBtn" class="btn btn-info">💾 Save Mission</button>
+                        <button id="loadMissionBtn" class="btn btn-secondary">📂 Load Mission</button>
+                        <button id="clearAllBtn" class="btn btn-danger">🗑️ Clear All Aircraft</button>
+                        <input type="file" id="missionFileInput" accept=".json" style="display: none;">
+                    </div>
+                </div>
+            </div>
+            
             <h3>Active Aircraft</h3>
             <div id="aircraftList"></div>
         </div>
