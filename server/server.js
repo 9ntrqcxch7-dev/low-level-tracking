@@ -96,7 +96,7 @@ io.on('connection', (socket) => {
   // Get mission for saving
   socket.on('getMission', () => {
     const missionDataToSave = {
-      name: missionData.mission || "Custom Mission",
+      mission: missionData.mission || "Custom Mission", // 'mission' field stores the mission name (from JSON structure)
       description: "User-created mission",
       aircraft: missionData.aircraft.map(ac => ({
         id: ac.id,
@@ -117,8 +117,8 @@ io.on('connection', (socket) => {
       ...ac,
       startTime: ac.startTime ? new Date(ac.startTime) : undefined
     }));
-    missionData.mission = data.mission.name;
-    console.log(`Loaded mission: ${data.mission.name}`);
+    missionData.mission = data.mission.mission || data.mission.name || "Custom Mission"; // Support both field names
+    console.log(`Loaded mission: ${missionData.mission}`);
     
     // Re-initialize all clients
     io.emit('mission-data', missionData);
