@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛩️ Low-Level Aircraft Tracking System</title>
+    <title>🎯 Tactical Air Operations Command Center</title>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -15,8 +15,8 @@
     <div class="container">
         <!-- Header -->
         <header>
-            <h1>🛩️ Low-Level Aircraft Tracking System</h1>
-            <p class="subtitle">Real-time Aircraft Low-Level Navigation Tracking</p>
+            <h1>🎯 TACTICAL AIR OPERATIONS COMMAND CENTER</h1>
+            <p class="subtitle">Real-Time Aircraft Low-Level Navigation Control</p>
         </header>
 
         <!-- Control Panel -->
@@ -31,6 +31,16 @@
                 <label for="speedControl">Speed:</label>
                 <input type="range" id="speedControl" min="1" max="300" value="1" step="1">
                 <span id="speedValue">1x</span>
+                <div class="speed-control-grid">
+                    <button class="speed-btn active" data-speed="0.5">0.5x</button>
+                    <button class="speed-btn" data-speed="1">1x</button>
+                    <button class="speed-btn" data-speed="2">2x</button>
+                    <button class="speed-btn" data-speed="5">5x</button>
+                    <button class="speed-btn" data-speed="10">10x</button>
+                    <button class="speed-btn" data-speed="25">25x</button>
+                    <button class="speed-btn" data-speed="50">50x</button>
+                    <button class="speed-btn" data-speed="100">100x</button>
+                </div>
             </div>
             
             <div class="controls-right">
@@ -129,6 +139,16 @@
                 <h3>📏 Separation</h3>
                 <button id="toggle-distances-btn" class="btn btn-secondary btn-small">Show Matrix</button>
                 <div id="distance-matrix" style="display: none;"></div>
+            </div>
+            
+            <!-- Real-Time Separation Monitor -->
+            <div id="separation-panel" class="separation-panel">
+                <h3>🎯 Separation Monitor</h3>
+                <div id="closest-pair-display"></div>
+                <div class="all-pairs">
+                    <h4>All Aircraft Pairs:</h4>
+                    <div id="all-pairs-list"></div>
+                </div>
             </div>
             
             <h3>Active Aircraft</h3>

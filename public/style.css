@@ -5,9 +5,9 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #333;
+    font-family: 'Courier New', Consolas, Monaco, monospace;
+    background: #0d0d0d;
+    color: #00ff41;
     min-height: 100vh;
 }
 
@@ -19,28 +19,54 @@ body {
 
 header {
     text-align: center;
-    color: white;
+    color: #00ff41;
     margin-bottom: 20px;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    background: #1a1a1a;
+    padding: 20px;
+    border: 2px solid #00ff41;
+    border-radius: 0;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.3), inset 0 0 20px rgba(0, 255, 65, 0.1);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%);
+    position: relative;
+}
+
+header::before {
+    content: '╔════════════════════════════════════════════════════════╗';
+    display: block;
+    font-size: 0.8em;
+    opacity: 0.5;
+    letter-spacing: 2px;
+}
+
+header::after {
+    content: '╚════════════════════════════════════════════════════════╝';
+    display: block;
+    font-size: 0.8em;
+    opacity: 0.5;
+    letter-spacing: 2px;
 }
 
 header h1 {
-    font-size: 2.5em;
-    margin-bottom: 10px;
+    font-size: 2em;
+    margin: 10px 0;
+    text-shadow: 0 0 10px #00ff41;
+    letter-spacing: 3px;
 }
 
 .subtitle {
-    font-size: 1.2em;
-    opacity: 0.9;
+    font-size: 1em;
+    opacity: 0.8;
+    letter-spacing: 2px;
 }
 
 /* Control Panel */
 .control-panel {
-    background: white;
-    border-radius: 10px;
+    background: #1a1a1a;
+    border: 2px solid #00ff41;
+    border-radius: 0;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -58,88 +84,122 @@ header h1 {
 
 .btn {
     padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
+    border: 2px solid #00ff41;
+    background: #1a1a1a;
+    color: #00ff41;
+    border-radius: 0;
     cursor: pointer;
     font-size: 16px;
     font-weight: 600;
+    font-family: 'Courier New', monospace;
     transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
 }
 
 .btn:hover:not(:disabled) {
+    background: #00ff41;
+    color: #0d0d0d;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.6);
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .btn:disabled {
-    opacity: 0.5;
+    opacity: 0.3;
     cursor: not-allowed;
+    border-color: #555;
+    color: #555;
 }
 
 .btn-primary {
-    background: #4CAF50;
-    color: white;
+    background: #00ff41;
+    color: #0d0d0d;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: #45a049;
+    box-shadow: 0 0 30px rgba(0, 255, 65, 0.8);
 }
 
 .btn-secondary {
-    background: #2196F3;
-    color: white;
+    background: #1a1a1a;
+    color: #00ff41;
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: #0b7dda;
+    background: #00ff41;
+    color: #0d0d0d;
 }
 
 #speedControl {
     width: 200px;
     cursor: pointer;
+    accent-color: #00ff41;
 }
 
 #speedValue {
     font-weight: bold;
     min-width: 50px;
     display: inline-block;
+    color: #00ff41;
+    font-family: 'Courier New', monospace;
+}
+
+.controls-center label {
+    color: #00ff41;
+    font-family: 'Courier New', monospace;
 }
 
 .status {
     display: flex;
     gap: 15px;
     font-weight: 600;
+    font-family: 'Courier New', monospace;
 }
 
 .status-connected {
-    color: #4CAF50;
+    color: #00ff00;
+    text-shadow: 0 0 8px #00ff00;
+    animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }
 
 .status-disconnected {
-    color: #f44336;
+    color: #ff0000;
+    text-shadow: 0 0 8px #ff0000;
 }
 
 /* Map */
 #map {
     height: 600px;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 2px solid #00ff41;
+    border-radius: 0;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.3), inset 0 0 50px rgba(0, 0, 0, 0.8);
     margin-bottom: 20px;
 }
 
 /* Info Panel */
 .info-panel {
-    background: white;
-    border-radius: 10px;
+    background: #1a1a1a;
+    border: 2px solid #00ff41;
+    border-radius: 0;
     padding: 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
 }
 
 .info-panel h3 {
     margin-bottom: 15px;
-    color: #667eea;
-    border-bottom: 2px solid #667eea;
+    color: #00ff41;
+    border-bottom: 2px solid #00ff41;
     padding-bottom: 10px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px #00ff41;
 }
 
 #aircraftList {
@@ -149,21 +209,24 @@ header h1 {
 }
 
 .aircraft-card {
-    border: 2px solid #ddd;
-    border-radius: 8px;
+    border: 2px solid #00ff41;
+    border-radius: 0;
     padding: 15px;
-    background: #f9f9f9;
+    background: #0d0d0d;
     transition: all 0.3s ease;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
 }
 
 .aircraft-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
 }
 
 .aircraft-card.active {
-    border-color: #4CAF50;
-    background: #e8f5e9;
+    border-color: #00ff00;
+    background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 25px rgba(0, 255, 0, 0.5);
 }
 
 .aircraft-header {
@@ -177,17 +240,21 @@ header h1 {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 2px solid #333;
+    border: 2px solid #00ff41;
 }
 
 .aircraft-callsign {
     font-weight: bold;
     font-size: 1.2em;
+    color: #00ff41;
+    text-shadow: 0 0 5px #00ff41;
+    font-family: 'Courier New', monospace;
 }
 
 .aircraft-type {
-    color: #666;
+    color: #888;
     font-size: 0.9em;
+    font-family: 'Courier New', monospace;
 }
 
 .aircraft-info {
@@ -195,15 +262,16 @@ header h1 {
     grid-template-columns: auto 1fr;
     gap: 5px 10px;
     font-size: 0.9em;
+    font-family: 'Courier New', monospace;
 }
 
 .aircraft-info .label {
     font-weight: 600;
-    color: #666;
+    color: #00ff41;
 }
 
 .aircraft-info .value {
-    color: #333;
+    color: #0f0;
 }
 
 /* Responsive Design */
@@ -261,15 +329,18 @@ header h1 {
 
 /* Mission Editor Styles */
 .mission-editor {
-    background: #34495e;
-    border-radius: 10px;
+    background: #1a1a1a;
+    border: 2px solid #00ff41;
+    border-radius: 0;
     margin-bottom: 20px;
     padding: 0;
     overflow: hidden;
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
 }
 
 .editor-header {
-    color: white;
+    color: #00ff41;
+    background: #0d0d0d;
     padding: 15px 20px;
     margin: 0;
     cursor: pointer;
@@ -277,14 +348,20 @@ header h1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-bottom: 2px solid #00ff41;
 }
 
 .editor-header:hover {
-    background: #3d566e;
+    background: #1a1a1a;
+    box-shadow: inset 0 0 20px rgba(0, 255, 65, 0.2);
 }
 
 .toggle-icon {
     transition: transform 0.3s ease;
+    color: #00ff41;
 }
 
 .toggle-icon.collapsed {
@@ -293,7 +370,7 @@ header h1 {
 
 .editor-content {
     padding: 20px;
-    background: white;
+    background: #0d0d0d;
 }
 
 .editor-content.hidden {
@@ -304,12 +381,15 @@ header h1 {
 .aircraft-form {
     margin-bottom: 20px;
     padding-bottom: 20px;
-    border-bottom: 2px solid #ddd;
+    border-bottom: 2px solid #00ff41;
 }
 
 .aircraft-form h4 {
     margin-bottom: 15px;
-    color: #34495e;
+    color: #00ff41;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 .form-group {
@@ -320,7 +400,11 @@ header h1 {
     display: block;
     font-weight: 600;
     margin-bottom: 5px;
-    color: #555;
+    color: #00ff41;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    font-size: 0.9em;
+    letter-spacing: 1px;
 }
 
 .form-group input[type="text"],
@@ -328,35 +412,49 @@ header h1 {
 .form-group input[type="time"] {
     width: 100%;
     padding: 8px 12px;
-    border: 2px solid #ddd;
-    border-radius: 5px;
+    border: 2px solid #00ff41;
+    background: #0d0d0d;
+    color: #00ff41;
+    border-radius: 0;
     font-size: 14px;
+    font-family: 'Courier New', monospace;
 }
 
 .form-group input[type="color"] {
     width: 60px;
     height: 40px;
-    border: 2px solid #ddd;
-    border-radius: 5px;
+    border: 2px solid #00ff41;
+    background: #0d0d0d;
+    border-radius: 0;
     cursor: pointer;
 }
 
 .form-group input:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #00ff41;
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
 }
 
 /* Waypoint Controls */
 .waypoint-controls {
     margin: 20px 0;
     padding: 15px;
-    background: #f9f9f9;
-    border-radius: 8px;
+    background: #1a1a1a;
+    border: 1px solid #00ff41;
+    border-radius: 0;
 }
 
 .waypoint-controls h5 {
     margin-bottom: 10px;
-    color: #34495e;
+    color: #00ff41;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+}
+
+.waypoint-controls p {
+    color: #888;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
 }
 
 .waypoint-buttons {
@@ -372,66 +470,74 @@ header h1 {
 }
 
 .waypoint-item {
-    background: white;
+    background: #0d0d0d;
     padding: 8px 12px;
     margin-bottom: 8px;
-    border-radius: 5px;
+    border-radius: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid #ddd;
+    border: 1px solid #00ff41;
 }
 
 .waypoint-coords {
     font-size: 0.9em;
-    color: #555;
+    color: #00ff41;
+    font-family: 'Courier New', monospace;
 }
 
 .waypoint-remove {
-    background: #f44336;
-    color: white;
-    border: none;
+    background: #ff0000;
+    color: #0d0d0d;
+    border: 1px solid #ff0000;
     padding: 4px 8px;
-    border-radius: 3px;
+    border-radius: 0;
     cursor: pointer;
     font-size: 0.8em;
+    font-family: 'Courier New', monospace;
 }
 
 .waypoint-remove:hover {
-    background: #d32f2f;
+    background: #0d0d0d;
+    color: #ff0000;
 }
 
 /* Button Styles */
 .btn-info {
-    background: #2196F3;
-    color: white;
+    background: #1a1a1a;
+    color: #00ff41;
+    border: 2px solid #00ff41;
 }
 
 .btn-info:hover:not(:disabled) {
-    background: #0b7dda;
+    background: #00ff41;
+    color: #0d0d0d;
 }
 
 .btn-info.active {
-    background: #0b7dda;
-    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.3);
+    background: #00ff41;
+    color: #0d0d0d;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
 }
 
 .btn-success {
-    background: #4CAF50;
-    color: white;
+    background: #00ff00;
+    color: #0d0d0d;
+    border: 2px solid #00ff00;
 }
 
 .btn-success:hover:not(:disabled) {
-    background: #45a049;
+    box-shadow: 0 0 25px rgba(0, 255, 0, 0.6);
 }
 
 .btn-danger {
-    background: #f44336;
-    color: white;
+    background: #ff0000;
+    color: #0d0d0d;
+    border: 2px solid #ff0000;
 }
 
 .btn-danger:hover:not(:disabled) {
-    background: #d32f2f;
+    box-shadow: 0 0 25px rgba(255, 0, 0, 0.6);
 }
 
 .btn-small {
@@ -446,7 +552,10 @@ header h1 {
 
 .mission-actions h4 {
     margin-bottom: 15px;
-    color: #34495e;
+    color: #00ff41;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 .mission-actions button {
@@ -463,34 +572,39 @@ header h1 {
 
 .icon-btn {
     padding: 6px 12px;
-    border: none;
-    border-radius: 5px;
+    border: 2px solid #00ff41;
+    background: #0d0d0d;
+    color: #00ff41;
+    border-radius: 0;
     cursor: pointer;
     font-size: 14px;
+    font-family: 'Courier New', monospace;
     transition: all 0.3s ease;
 }
 
 .icon-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
 }
 
 .btn-edit {
-    background: #FFC107;
-    color: #333;
+    background: #ffcc00;
+    color: #0d0d0d;
+    border-color: #ffcc00;
 }
 
 .btn-edit:hover {
-    background: #FFB300;
+    box-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
 }
 
 .btn-delete {
-    background: #f44336;
-    color: white;
+    background: #ff0000;
+    color: #0d0d0d;
+    border-color: #ff0000;
 }
 
 .btn-delete:hover {
-    background: #d32f2f;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
 }
 
 /* Waypoint Mode Cursor */
@@ -506,60 +620,76 @@ header h1 {
 .conflict-panel {
     margin-bottom: 20px;
     padding: 15px;
-    background: #34495e;
-    border-radius: 8px;
+    background: #1a1a1a;
+    border: 2px solid #ff0000;
+    border-radius: 0;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
 }
 
 .conflict-panel h3 {
     font-size: 16px;
-    color: #e74c3c;
+    color: #ff0000;
     margin-bottom: 10px;
     display: flex;
     align-items: center;
     gap: 10px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px #ff0000;
 }
 
 .badge {
     display: inline-block;
-    background: #e74c3c;
-    color: white;
+    background: #ff0000;
+    color: #0d0d0d;
     padding: 2px 8px;
-    border-radius: 12px;
+    border-radius: 0;
     font-size: 12px;
     font-weight: bold;
+    font-family: 'Courier New', monospace;
 }
 
 .conflict-item {
-    background: #2c3e50;
+    background: #0d0d0d;
     padding: 10px;
-    border-radius: 6px;
+    border-radius: 0;
     margin-bottom: 8px;
-    border-left: 4px solid #e74c3c;
+    border-left: 4px solid #ff0000;
+    border: 2px solid #ff0000;
+    font-family: 'Courier New', monospace;
 }
 
 .conflict-item.warning {
-    border-left-color: #f39c12;
+    border-color: #ffcc00;
 }
 
 .conflict-item.critical {
-    border-left-color: #e74c3c;
-    animation: pulse 1s infinite;
+    border-color: #ff0000;
+    animation: pulse-red 1s infinite;
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+@keyframes pulse-red {
+    0%, 100% { 
+        opacity: 1;
+        box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+    }
+    50% { 
+        opacity: 0.7;
+        box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+    }
 }
 
 .conflict-aircraft {
     font-weight: bold;
-    color: #fff;
+    color: #ff0000;
     font-size: 14px;
+    text-shadow: 0 0 5px #ff0000;
 }
 
 .conflict-metrics {
     font-size: 11px;
-    color: #95a5a6;
+    color: #888;
     margin-top: 5px;
 }
 
@@ -567,14 +697,20 @@ header h1 {
 .distance-panel {
     margin-bottom: 20px;
     padding: 15px;
-    background: #34495e;
-    border-radius: 8px;
+    background: #1a1a1a;
+    border: 2px solid #00ff41;
+    border-radius: 0;
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
 }
 
 .distance-panel h3 {
     font-size: 16px;
-    color: #3498db;
+    color: #00ff41;
     margin-bottom: 10px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px #00ff41;
 }
 
 #distance-matrix {
@@ -582,20 +718,22 @@ header h1 {
 }
 
 .distance-item {
-    background: #2c3e50;
+    background: #0d0d0d;
     padding: 8px;
-    border-radius: 4px;
+    border-radius: 0;
     margin-bottom: 6px;
     font-size: 12px;
+    border: 1px solid #00ff41;
+    font-family: 'Courier New', monospace;
 }
 
 .distance-pair {
     font-weight: bold;
-    color: #3498db;
+    color: #00ff41;
 }
 
 .distance-values {
-    color: #95a5a6;
+    color: #888;
     margin-top: 3px;
     font-size: 11px;
 }
@@ -606,21 +744,32 @@ header h1 {
     align-items: center;
     gap: 5px;
     font-size: 12px;
-    color: #95a5a6;
+    color: #888;
     margin-top: 3px;
+    font-family: 'Courier New', monospace;
 }
 
 .altitude-indicator {
     font-size: 14px;
 }
 
-.climbing { color: #27ae60; }
-.descending { color: #e74c3c; }
-.level { color: #95a5a6; }
+.climbing { 
+    color: #00ff00;
+    text-shadow: 0 0 5px #00ff00;
+}
+
+.descending { 
+    color: #ff0000;
+    text-shadow: 0 0 5px #ff0000;
+}
+
+.level { 
+    color: #888;
+}
 
 .altitude-value {
     font-weight: bold;
-    color: #3498db;
+    color: #00ff41;
 }
 
 /* Make aircraft items taller for altitude display */
@@ -638,34 +787,72 @@ header h1 {
 .aircraft-icon {
   font-size: 24px;
   transition: transform 0.3s ease;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)) drop-shadow(0 0 8px #00ff41);
+}
+
+/* Aircraft Marker Label - Tactical Style */
+.aircraft-marker-label {
+  font-family: 'Courier New', Consolas, Monaco, monospace;
+  color: #00ff41;
+  text-shadow: 0 0 8px #00ff41, 0 0 3px #000;
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 4px;
+  border: 1px solid #00ff41;
+  white-space: nowrap;
+}
+
+.aircraft-marker-label .callsign {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.aircraft-marker-label .altitude {
+  display: block;
+  font-size: 9px;
+  color: #0f0;
+}
+
+.aircraft-marker-label .indicator {
+  display: inline;
+  margin-left: 2px;
+  font-size: 10px;
 }
 
 /* Aircraft Popup */
 .aircraft-popup {
   min-width: 200px;
-  font-family: Arial, sans-serif;
+  font-family: 'Courier New', monospace;
 }
 
 .popup-header {
   padding: 8px 12px;
-  color: white;
+  color: #00ff41;
+  background: #0d0d0d;
   font-size: 14px;
   font-weight: bold;
-  border-radius: 4px 4px 0 0;
+  border: 2px solid #00ff41;
+  border-radius: 0;
   text-align: center;
+  text-shadow: 0 0 8px #00ff41;
 }
 
 .popup-body {
   padding: 10px;
-  background: white;
+  background: #1a1a1a;
+  color: #00ff41;
+  border: 2px solid #00ff41;
+  border-top: none;
 }
 
 .popup-row {
   display: flex;
   justify-content: space-between;
   padding: 4px 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #00ff41;
 }
 
 .popup-row:last-child {
@@ -674,11 +861,156 @@ header h1 {
 
 .popup-label {
   font-weight: bold;
-  color: #666;
+  color: #00ff41;
   font-size: 12px;
 }
 
 .popup-value {
-  color: #333;
+  color: #0f0;
+  font-size: 12px;
+}
+
+/* Speed Control Grid */
+.speed-control-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.speed-btn {
+  padding: 8px 12px;
+  border: 2px solid #00ff41;
+  background: #1a1a1a;
+  color: #00ff41;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.speed-btn:hover {
+  background: #00ff41;
+  color: #0d0d0d;
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
+}
+
+.speed-btn.active {
+  background: #00ff41;
+  color: #0d0d0d;
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+  border-color: #0f0;
+}
+
+/* Separation Monitor Panel */
+.separation-panel {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #1a1a1a;
+  border: 2px solid #00ff41;
+  border-radius: 0;
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+}
+
+.separation-panel h3 {
+  font-size: 16px;
+  color: #00ff41;
+  margin-bottom: 10px;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px #00ff41;
+  border-bottom: 2px solid #00ff41;
+  padding-bottom: 8px;
+}
+
+.closest-pair {
+  background: #0d0d0d;
+  padding: 12px;
+  margin-bottom: 15px;
+  border: 2px solid #00ff41;
+  font-family: 'Courier New', monospace;
+}
+
+.closest-pair.caution {
+  border-color: #ffcc00;
+}
+
+.closest-pair.conflict {
+  border-color: #ff0000;
+  animation: pulse-red 1s infinite;
+}
+
+.pair-aircraft {
+  font-weight: bold;
+  color: #00ff41;
+  font-size: 14px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 5px #00ff41;
+}
+
+.pair-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 12px;
+  color: #0f0;
+}
+
+.metric-label {
+  color: #888;
+}
+
+.all-pairs {
+  border-top: 2px solid #00ff41;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.all-pairs h4 {
+  color: #00ff41;
+  font-size: 13px;
+  margin-bottom: 8px;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+}
+
+.pair-item {
+  background: #0d0d0d;
+  padding: 8px;
+  margin-bottom: 6px;
+  border: 1px solid #00ff41;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pair-item.safe {
+  border-left: 4px solid #00ff00;
+}
+
+.pair-item.caution {
+  border-left: 4px solid #ffcc00;
+}
+
+.pair-item.conflict {
+  border-left: 4px solid #ff0000;
+}
+
+.pair-names {
+  color: #00ff41;
+}
+
+.pair-sep {
+  color: #0f0;
+  font-size: 10px;
+}
+
+.status-indicator {
   font-size: 12px;
 }
