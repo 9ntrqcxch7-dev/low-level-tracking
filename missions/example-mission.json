@@ -55,5 +55,20 @@
       ],
       "color": "#44FF44"
     }
+    ,
+    {
+      "id": "AC004",
+      "callsign": "FALCON-4",
+      "type": "Gripen",
+      "speed": 320,
+      "startTime": "2024-01-01T07:05:00Z",
+      "departure": "ESIB",
+      "arrival": "ESCM",
+      "route": [
+        { "lat": 58.426399, "lon": 12.714400, "alt": 3000 },
+        { "lat": 59.897301, "lon": 17.588600, "alt": 1000 }
+      ],
+      "color": "#FFAA00"
+    }
   ]
 }

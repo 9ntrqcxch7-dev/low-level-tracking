@@ -1,6 +1,9 @@
 // WebSocket connection
 let socket;
 let map;
+let militaryLayer = null;
+let militaryMarkers = {};
+let militaryMarkersInitialized = false;
 let missionData = null;
 let aircraftMarkers = {};
 let aircraftPaths = {};
@@ -45,7 +48,80 @@ function initializeMap() {
         attribution: '© OpenStreetMap contributors',
         maxZoom: 19
     }).addTo(map);
+
+    // layer to hold military airport markers (cleared/reused to avoid duplicates)
+    militaryLayer = L.layerGroup().addTo(map);
+    // map of current military markers keyed by ICAO code to avoid duplicates
+    militaryMarkers = {};
+
+    // Add military airport markers once the map is ready
+    map.whenReady(() => {
+        addMilitaryAirportMarkers();
+    });
 }
+
+// Place markers for the key military airports so they are visible on the map
+function addMilitaryAirportMarkers() {
+    if (!window.SWEDISH_AIRPORTS || !map) return;
+    // Prevent running this initialization multiple times which can cause duplicates
+    if (militaryMarkersInitialized) return;
+    if (!militaryLayer) militaryLayer = L.layerGroup().addTo(map);
+    // Clear existing group and our tracking map so we start fresh
+    militaryLayer.clearLayers();
+    militaryMarkers = {};
+    const militaryCodes = ['ESIB', 'ESDF', 'ESCM', 'ESCF', 'ESPE'];
+
+    const coords = [];
+    militaryCodes.forEach(code => {
+        const airport = SWEDISH_AIRPORTS[code];
+        if (!airport) return;
+
+        // If we already had a marker for this code, remove it first (defensive)
+        if (militaryMarkers[code]) {
+            try {
+                militaryLayer.removeLayer(militaryMarkers[code]);
+            } catch (e) {
+                // ignore
+            }
+            delete militaryMarkers[code];
+        }
+
+        const iconHtml = `
+            <div style="display:flex;flex-direction:column;align-items:center;">
+                <div style="width:18px;height:18px;border-radius:50%;background:#0033cc;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>
+                <div style="background:rgba(0,0,0,0.7);color:#fff;padding:2px 6px;border-radius:4px;margin-top:4px;font-size:12px;white-space:nowrap;">${code}</div>
+            </div>
+        `;
+
+        const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [40, 40], iconAnchor: [20, 20] });
+        // Add a standard marker at the exact lat/lon so it's unmistakable
+        const marker = L.marker([airport.lat, airport.lon], { icon }).addTo(militaryLayer);
+        marker.bindPopup(`<strong>${code}</strong><br>${airport.name}`);
+        // Add a permanent tooltip (label) so marker is visible at a glance
+        marker.bindTooltip(code, { permanent: true, direction: 'right', className: 'airport-tooltip' }).openTooltip();
+
+        // Track by code to avoid duplicates on subsequent calls
+        militaryMarkers[code] = marker;
+        coords.push([airport.lat, airport.lon]);
+    });
+
+    // If military markers were added, fit map to show them
+    if (coords.length > 0) {
+        try {
+            const bounds = L.latLngBounds(coords);
+            map.fitBounds(bounds.pad(0.5), { padding: [50, 50] });
+            // Also pan to first marker to ensure visibility
+            map.panTo(coords[0]);
+        } catch (e) {
+            // ignore
+        }
+        // Mark initialized so repeated calls don't add duplicates
+        militaryMarkersInitialized = true;
+    }
+}
+
+// Add guaranteed default Leaflet markers (with default icon) for debugging/visibility
+// Debug markers removed — production markers handled via `addMilitaryAirportMarkers()`
 
 // Initialize WebSocket connection
 function initializeWebSocket() {
@@ -227,6 +303,17 @@ function initializeMission() {
         aircraft.route.map(point => [point.lat, point.lon])
     );
     if (allCoords.length > 0) {
+        // Include military airport markers so they remain visible
+        try {
+            const militaryCodes = ['ESIB', 'ESDF', 'ESCM', 'ESCF', 'ESPE'];
+            militaryCodes.forEach(code => {
+                const ap = SWEDISH_AIRPORTS && SWEDISH_AIRPORTS[code];
+                if (ap && ap.lat && ap.lon) allCoords.push([ap.lat, ap.lon]);
+            });
+        } catch (e) {
+            // ignore if SWEDISH_AIRPORTS not available
+        }
+
         map.fitBounds(allCoords, { padding: [50, 50] });
     }
     
