@@ -573,7 +573,7 @@ function updateAircraftList(aircraftArray) {
                     <span class="label">Altitude:</span>
                     <span class="value">${currentPos.alt} ft</span>
                     <span class="label">Status:</span>
-                    <span class="value">${currentTime >= getMaxTime(aircraft) ? '✅ Complete' : '✈️ In Flight'}</span>
+                    <span class="value">${currentTime >= getMaxTime(aircraft) ? '✅ Complete' : '▲ In Flight'}</span>
                 </div>
                 <div class="aircraft-actions">
                     <button class="icon-btn btn-delete" onclick="deleteAircraft('${aircraft.id}')">
@@ -714,9 +714,7 @@ function updateAircraftPositions(aircraftData) {
                     html: `
                       <div style="position: relative; width: 80px; margin-left: -25px; margin-top: -30px;">
                         <div class="aircraft-marker-label callsign">${aircraft.callsign}</div>
-                        <div class="aircraft-icon" style="transform: rotate(${aircraft.heading || 0}deg); text-align: center; font-size: 24px;">
-                          ✈️
-                        </div>
+                                                <div class="aircraft-icon" style="width:0;height:0;margin:0 auto;transform: rotate(${aircraft.heading || 0}deg);border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:18px solid ${aircraft.color};"></div>
                         <div class="aircraft-marker-label altitude">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
                       </div>
                     `,
@@ -787,9 +785,7 @@ function updateAircraftPositions(aircraftData) {
                     html: `
                       <div style="position: relative; width: 80px; margin-left: -25px; margin-top: -30px;">
                         <div class="aircraft-marker-label callsign">${aircraft.callsign}</div>
-                        <div class="aircraft-icon" style="transform: rotate(${aircraft.heading || 0}deg); text-align: center; font-size: 24px;">
-                          ✈️
-                        </div>
+                                                <div class="aircraft-icon" style="width:0;height:0;margin:0 auto;transform: rotate(${aircraft.heading || 0}deg);border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:18px solid ${aircraft.color};"></div>
                         <div class="aircraft-marker-label altitude">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
                       </div>
                     `,
