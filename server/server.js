@@ -61,6 +61,78 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Add aircraft
+  socket.on('addAircraft', (data) => {
+    const newAc = {
+      ...data.aircraft,
+      startTime: data.aircraft.startTime ? new Date(data.aircraft.startTime) : undefined
+    };
+    missionData.aircraft.push(newAc);
+    
+    // Broadcast aircraft added
+    io.emit('aircraftAdded', { aircraft: newAc });
+    
+    // Re-initialize all clients
+    io.emit('mission-data', missionData);
+    
+    console.log(`Added aircraft: ${newAc.callsign}`);
+  });
+
+  // Delete aircraft
+  socket.on('deleteAircraft', (data) => {
+    const deleteIndex = missionData.aircraft.findIndex(ac => ac.id === data.id);
+    if (deleteIndex !== -1) {
+      const deleted = missionData.aircraft.splice(deleteIndex, 1)[0];
+      console.log(`Deleted aircraft: ${deleted.callsign}`);
+      
+      // Broadcast aircraft deleted
+      io.emit('aircraftDeleted', { id: data.id });
+      
+      // Re-initialize all clients
+      io.emit('mission-data', missionData);
+    }
+  });
+
+  // Get mission for saving
+  socket.on('getMission', () => {
+    const missionDataToSave = {
+      name: missionData.mission || "Custom Mission",
+      description: "User-created mission",
+      aircraft: missionData.aircraft.map(ac => ({
+        id: ac.id,
+        callsign: ac.callsign,
+        type: ac.type,
+        startTime: ac.startTime ? ac.startTime.toISOString() : undefined,
+        speed: ac.speed,
+        color: ac.color,
+        route: ac.route
+      }))
+    };
+    socket.emit('missionData', { mission: missionDataToSave });
+  });
+
+  // Load mission
+  socket.on('loadMission', (data) => {
+    missionData.aircraft = data.mission.aircraft.map(ac => ({
+      ...ac,
+      startTime: ac.startTime ? new Date(ac.startTime) : undefined
+    }));
+    missionData.mission = data.mission.name;
+    console.log(`Loaded mission: ${data.mission.name}`);
+    
+    // Re-initialize all clients
+    io.emit('mission-data', missionData);
+  });
+
+  // Clear all aircraft
+  socket.on('clearAll', () => {
+    missionData.aircraft = [];
+    console.log('Cleared all aircraft');
+    
+    // Re-initialize all clients
+    io.emit('mission-data', missionData);
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
