@@ -266,6 +266,53 @@ function calculateDistances(aircraftStates) {
   return distances;
 }
 
+// Calculate detailed separations for separation monitor
+function calculateSeparations(aircraftStates) {
+  const separations = [];
+
+  for (let i = 0; i < aircraftStates.length; i++) {
+    for (let j = i + 1; j < aircraftStates.length; j++) {
+      const ac1 = aircraftStates[i];
+      const ac2 = aircraftStates[j];
+
+      if (!ac1.position.active || !ac2.position.active) continue;
+
+      const horizontalDist = haversineDistance(
+        { lat: ac1.position.lat, lon: ac1.position.lon },
+        { lat: ac2.position.lat, lon: ac2.position.lon }
+      );
+
+      const verticalSep = Math.abs(ac1.altitude - ac2.altitude);
+      
+      // Calculate relative speed (approximate)
+      const speed1 = ac1.speed || 250;
+      const speed2 = ac2.speed || 250;
+      const relativeSpeed = Math.abs(speed1 - speed2);
+      
+      // Estimate time to CPA (simple approximation)
+      let timeToCPA = null;
+      if (relativeSpeed > 0 && horizontalDist < 20) {
+        // Convert NM/hour to NM/second, then calculate time
+        timeToCPA = (horizontalDist / (relativeSpeed / 3600));
+      }
+
+      separations.push({
+        aircraft1: ac1.callsign,
+        aircraft2: ac2.callsign,
+        horizontal: horizontalDist,
+        vertical: verticalSep,
+        relativeSpeed: relativeSpeed,
+        timeToCPA: timeToCPA
+      });
+    }
+  }
+
+  // Sort by horizontal distance (closest first)
+  separations.sort((a, b) => a.horizontal - b.horizontal);
+
+  return separations;
+}
+
 // Simulation update function
 function updateSimulation() {
   if (!simulationRunning) return;
@@ -291,13 +338,15 @@ function updateSimulation() {
 
   const conflicts = detectConflicts(aircraftStates);
   const distances = calculateDistances(aircraftStates);
+  const separations = calculateSeparations(aircraftStates);
 
   // Broadcast update to all clients
   io.emit('simulation-update', {
     time: simulationTime.toISOString(),
     aircraft: aircraftStates,
     conflicts: conflicts,
-    distances: distances
+    distances: distances,
+    separations: separations
   });
 
   // Advance simulation time
