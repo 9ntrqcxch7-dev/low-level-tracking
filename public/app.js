@@ -19,6 +19,16 @@ let aircraftCounter = 0;
 let showDistanceMatrix = false;
 let activeConflicts = [];
 
+// Constants
+const DEFAULT_CRUISE_ALTITUDE = 3000;
+const DEFAULT_ARRIVAL_ALTITUDE = 1000;
+
+// Airport lookup function
+function getAirportCoordinates(icaoCode) {
+    const code = icaoCode.toUpperCase().trim();
+    return SWEDISH_AIRPORTS[code] || null;
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     initializeMap();
@@ -787,19 +797,57 @@ function clearWaypoints() {
 function handleAddAircraft(e) {
     e.preventDefault();
     
-    // Validate minimum waypoints
-    if (tempWaypoints.length < 2) {
-        alert('Please add at least 2 waypoints for the route.');
-        return;
-    }
-    
     // Get form values
     const callsign = document.getElementById('aircraftCallsign').value;
     const speed = parseInt(document.getElementById('aircraftSpeed').value);
     const startTime = document.getElementById('aircraftStartTime').value;
     const color = document.getElementById('aircraftColor').value;
-    const departure = document.getElementById('aircraftDeparture').value.toUpperCase();
-    const arrival = document.getElementById('aircraftArrival').value.toUpperCase();
+    const departure = document.getElementById('aircraftDeparture').value.toUpperCase().trim();
+    const arrival = document.getElementById('aircraftArrival').value.toUpperCase().trim();
+    
+    // Build complete route with departure/arrival waypoints
+    let completeRoute = [];
+    
+    // Add departure airport as first waypoint (if provided)
+    if (departure) {
+        const departureAirport = getAirportCoordinates(departure);
+        if (!departureAirport) {
+            alert(`Unknown departure airport: ${departure}\nPlease use a valid Swedish ICAO code (e.g., ESSA, ESGG, ESMS)`);
+            return;
+        }
+        completeRoute.push({
+            lat: departureAirport.lat,
+            lng: departureAirport.lon,
+            alt: DEFAULT_CRUISE_ALTITUDE
+        });
+    }
+    
+    // Add manually clicked waypoints
+    completeRoute.push(...tempWaypoints.map(wp => ({
+        lat: wp.lat,
+        lng: wp.lng,
+        alt: wp.alt || DEFAULT_CRUISE_ALTITUDE
+    })));
+    
+    // Add arrival airport as last waypoint (if provided)
+    if (arrival) {
+        const arrivalAirport = getAirportCoordinates(arrival);
+        if (!arrivalAirport) {
+            alert(`Unknown arrival airport: ${arrival}\nPlease use a valid Swedish ICAO code (e.g., ESSA, ESGG, ESMS)`);
+            return;
+        }
+        completeRoute.push({
+            lat: arrivalAirport.lat,
+            lng: arrivalAirport.lon,
+            alt: DEFAULT_ARRIVAL_ALTITUDE
+        });
+    }
+    
+    // Validate minimum waypoints
+    if (completeRoute.length < 2) {
+        alert('Route must have at least 2 waypoints.\n\nYou can either:\n- Enter departure AND arrival airports, OR\n- Click the map to add at least 2 waypoints');
+        return;
+    }
     
     // Create aircraft object
     aircraftCounter++;
@@ -811,7 +859,7 @@ function handleAddAircraft(e) {
         color: color,
         departure: departure,
         arrival: arrival,
-        route: tempWaypoints.map(wp => ({ lat: wp.lat, lng: wp.lng, alt: wp.alt || 3000 }))
+        route: completeRoute
     };
     
     // Send to server

@@ -90,6 +90,9 @@
                         <!-- Waypoint Controls -->
                         <div class="waypoint-controls">
                             <h5>Waypoints <span id="waypointCount">(0)</span></h5>
+                            <p style="font-size: 11px; color: #95a5a6; margin: 5px 0;">
+                                Departure/arrival airports auto-create first/last waypoints. Add intermediate waypoints by clicking the map.
+                            </p>
                             <div class="waypoint-buttons">
                                 <button type="button" id="addWaypointBtn" class="btn btn-info">
                                     📍 Click Map to Add
@@ -138,6 +141,9 @@
     
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Airport Database -->
+    <script src="airports.js"></script>
     
     <!-- Custom JS -->
     <script src="app.js"></script>
