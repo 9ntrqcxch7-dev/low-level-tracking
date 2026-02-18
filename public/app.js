@@ -314,6 +314,9 @@ function initializeMissionEditor() {
         toggleIcon.classList.toggle('collapsed');
     });
     
+    // Initialize waypoint display
+    updateWaypointDisplay();
+    
     // Waypoint mode toggle
     const addWaypointBtn = document.getElementById('addWaypointBtn');
     addWaypointBtn.addEventListener('click', toggleWaypointMode);
