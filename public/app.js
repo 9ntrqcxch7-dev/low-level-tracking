@@ -1034,18 +1034,20 @@ function updateAircraftDisplay(aircraft) {
         const altitudeDisplay = ac.altitude ? `
             <div class="altitude-display">
                 <span class="altitude-indicator ${vspeedClass}">${vspeedIndicator}</span>
-                <span class="altitude-value">${ac.altitude.toLocaleString()} ft</span>
-                ${Math.abs(ac.verticalSpeed || 0) > 100 ? 
-                  `<span style="font-size: 10px;">(${ac.verticalSpeed > 0 ? '+' : ''}${ac.verticalSpeed} ft/min)</span>` 
-                  : ''}
-            </div>
-        ` : '';
-        
-        return `
-            <div class="aircraft-card">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                        <div class="aircraft-marker" style="background-color: ${ac.color}"></div>
+                                    // Create custom SVG triangle icon with labels; anchor at the triangle tip (top center)
+                                    const iconHtml = `
+                                            <div style="position: relative; width: 60px; height: 44px;">
+                                                    <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 0;">
+                                                            <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
+                                                                    <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
+                                                            </svg>
+                                                    </div>
+                                                    <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; font-size: 11px; display:flex; gap:8px; align-items:center;">
+                                                        <div style="font-weight:700; color:#111;">${aircraft.callsign}</div>
+                                                        <div style="color:#555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
+                                                    </div>
+                                            </div>
+                                    `;
                         <div style="flex: 1;">
                             <div style="font-weight: bold;">${ac.callsign}</div>
                             <div style="font-size: 11px; color: #95a5a6;">${status}</div>
