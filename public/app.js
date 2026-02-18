@@ -3,7 +3,6 @@ let socket;
 let map;
 let militaryLayer = null;
 let militaryMarkers = {};
-let militaryMarkersInitialized = false;
 let missionData = null;
 let aircraftMarkers = {};
 let aircraftPaths = {};
@@ -54,17 +53,18 @@ function initializeMap() {
     // map of current military markers keyed by ICAO code to avoid duplicates
     militaryMarkers = {};
 
-    // Add military airport markers once the map is ready
+    // Ensure any existing military markers are removed on startup
     map.whenReady(() => {
-        addMilitaryAirportMarkers();
+        // Clear any existing military markers then add simple circle markers
+        removeMilitaryAirportMarkers();
+        addMilitaryAirportCircles();
     });
 }
 
 // Place markers for the key military airports so they are visible on the map
 function addMilitaryAirportMarkers() {
     if (!window.SWEDISH_AIRPORTS || !map) return;
-    // Prevent running this initialization multiple times which can cause duplicates
-    if (militaryMarkersInitialized) return;
+    // Ensure the layer exists; always clear and re-sync to avoid duplicates
     if (!militaryLayer) militaryLayer = L.layerGroup().addTo(map);
     // Clear existing group and our tracking map so we start fresh
     militaryLayer.clearLayers();
@@ -115,8 +115,60 @@ function addMilitaryAirportMarkers() {
         } catch (e) {
             // ignore
         }
-        // Mark initialized so repeated calls don't add duplicates
-        militaryMarkersInitialized = true;
+        // Completed marker placement; function is idempotent so repeated calls are safe
+    }
+}
+
+// Remove all military airport markers (safe to call repeatedly)
+function removeMilitaryAirportMarkers() {
+    try {
+        if (militaryLayer) {
+            militaryLayer.clearLayers();
+        }
+    } catch (e) {
+        // ignore
+    }
+    militaryMarkers = {};
+}
+
+// Add simple circle markers for the military airports
+function addMilitaryAirportCircles() {
+    if (!window.SWEDISH_AIRPORTS || !map) return;
+    if (!militaryLayer) militaryLayer = L.layerGroup().addTo(map);
+
+    // Clear and rebuild so repeated calls are idempotent
+    militaryLayer.clearLayers();
+    militaryMarkers = {};
+
+    const militaryCodes = ['ESIB', 'ESDF', 'ESCM', 'ESCF', 'ESPE'];
+    const coords = [];
+
+    militaryCodes.forEach(code => {
+        const airport = SWEDISH_AIRPORTS[code];
+        if (!airport || !airport.lat || !airport.lon) return;
+
+        const circle = L.circleMarker([airport.lat, airport.lon], {
+            radius: 6,
+            color: '#0033cc',
+            fillColor: '#0033cc',
+            fillOpacity: 0.9,
+            weight: 2
+        }).addTo(militaryLayer);
+
+        // No permanent label; keep a popup for details on click
+        circle.bindPopup(`<strong>${code}</strong><br>${airport.name}`);
+
+        militaryMarkers[code] = circle;
+        coords.push([airport.lat, airport.lon]);
+    });
+
+    if (coords.length > 0) {
+        try {
+            const bounds = L.latLngBounds(coords);
+            map.fitBounds(bounds.pad(0.5), { padding: [50, 50] });
+        } catch (e) {
+            // ignore
+        }
     }
 }
 
