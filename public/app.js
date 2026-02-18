@@ -9,11 +9,18 @@ let currentTime = 0;
 let playbackSpeed = 1;
 let animationInterval = null;
 
+// Mission Editor State
+let waypointMode = false;
+let tempWaypoints = [];
+let tempWaypointMarkers = [];
+let aircraftCounter = 0;
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     initializeMap();
     initializeWebSocket();
     initializeControls();
+    initializeMissionEditor();
 });
 
 // Initialize Leaflet map
@@ -45,6 +52,17 @@ function initializeWebSocket() {
         console.log('Received mission data:', data);
         missionData = data;
         initializeMission();
+    });
+    
+    // Handle mission editor responses
+    socket.on('mission-saved', (data) => {
+        console.log('Mission saved data:', data);
+        downloadMissionFile(data);
+    });
+    
+    socket.on('error', (error) => {
+        console.error('Server error:', error);
+        alert('Error: ' + error.message);
     });
 }
 
@@ -149,7 +167,7 @@ function updateAircraftList() {
                 <div class="aircraft-header">
                     <div class="aircraft-color" style="background-color: ${aircraft.color};"></div>
                     <span class="aircraft-callsign">${aircraft.callsign}</span>
-                    <span class="aircraft-type">(${aircraft.type})</span>
+                    <span class="aircraft-type">(${aircraft.type || 'Custom'})</span>
                 </div>
                 <div class="aircraft-info">
                     <span class="label">Latitude:</span>
@@ -160,6 +178,11 @@ function updateAircraftList() {
                     <span class="value">${currentPos.alt} ft</span>
                     <span class="label">Status:</span>
                     <span class="value">${currentTime >= getMaxTime(aircraft) ? '✅ Complete' : '✈️ In Flight'}</span>
+                </div>
+                <div class="aircraft-actions">
+                    <button class="icon-btn btn-delete" onclick="deleteAircraft('${aircraft.id}')">
+                        🗑️ Delete
+                    </button>
                 </div>
             </div>
         `;
@@ -273,4 +296,240 @@ function updateAircraftPositions() {
 // Update time display
 function updateTimeDisplay() {
     document.getElementById('timeDisplay').textContent = `Time: ${currentTime.toFixed(1)}s`;
+}
+
+// ============================================
+// MISSION EDITOR FUNCTIONS
+// ============================================
+
+// Initialize Mission Editor
+function initializeMissionEditor() {
+    // Toggle editor visibility
+    const editorToggle = document.getElementById('editorToggle');
+    const editorContent = document.getElementById('editorContent');
+    const toggleIcon = editorToggle.querySelector('.toggle-icon');
+    
+    editorToggle.addEventListener('click', () => {
+        editorContent.classList.toggle('hidden');
+        toggleIcon.classList.toggle('collapsed');
+    });
+    
+    // Initialize waypoint display
+    updateWaypointDisplay();
+    
+    // Waypoint mode toggle
+    const addWaypointBtn = document.getElementById('addWaypointBtn');
+    addWaypointBtn.addEventListener('click', toggleWaypointMode);
+    
+    // Clear waypoints
+    const clearWaypointsBtn = document.getElementById('clearWaypointsBtn');
+    clearWaypointsBtn.addEventListener('click', clearWaypoints);
+    
+    // Form submission
+    const addAircraftForm = document.getElementById('addAircraftForm');
+    addAircraftForm.addEventListener('submit', handleAddAircraft);
+    
+    // Mission actions
+    document.getElementById('saveMissionBtn').addEventListener('click', saveMission);
+    document.getElementById('loadMissionBtn').addEventListener('click', () => {
+        document.getElementById('missionFileInput').click();
+    });
+    document.getElementById('missionFileInput').addEventListener('change', handleLoadMission);
+    document.getElementById('clearAllBtn').addEventListener('click', clearAllAircraft);
+}
+
+// Toggle waypoint click mode
+function toggleWaypointMode() {
+    waypointMode = !waypointMode;
+    const addWaypointBtn = document.getElementById('addWaypointBtn');
+    
+    if (waypointMode) {
+        addWaypointBtn.classList.add('active');
+        addWaypointBtn.textContent = '✓ Click Map (Active)';
+        map.getContainer().classList.add('waypoint-mode');
+        
+        // Add click listener to map
+        map.on('click', handleMapClick);
+    } else {
+        addWaypointBtn.classList.remove('active');
+        addWaypointBtn.textContent = '📍 Click Map to Add';
+        map.getContainer().classList.remove('waypoint-mode');
+        
+        // Remove click listener
+        map.off('click', handleMapClick);
+    }
+}
+
+// Handle map click for adding waypoints
+function handleMapClick(e) {
+    if (!waypointMode) return;
+    
+    const { lat, lng } = e.latlng;
+    tempWaypoints.push({ lat, lng });
+    
+    // Add temporary marker (yellow circle)
+    const marker = L.circleMarker([lat, lng], {
+        radius: 8,
+        fillColor: '#FFD700',
+        color: '#FFA500',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+    }).addTo(map);
+    
+    marker.bindPopup(`Waypoint ${tempWaypoints.length}<br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}`);
+    tempWaypointMarkers.push(marker);
+    
+    updateWaypointDisplay();
+}
+
+// Update waypoint list display
+function updateWaypointDisplay() {
+    const waypointList = document.getElementById('waypointList');
+    const waypointCount = document.getElementById('waypointCount');
+    
+    waypointCount.textContent = `(${tempWaypoints.length})`;
+    
+    if (tempWaypoints.length === 0) {
+        waypointList.innerHTML = '<p style="color: #999; font-size: 0.9em;">No waypoints added. Click map to add.</p>';
+        return;
+    }
+    
+    waypointList.innerHTML = tempWaypoints.map((wp, index) => `
+        <div class="waypoint-item">
+            <span class="waypoint-coords">
+                ${index + 1}. Lat: ${wp.lat.toFixed(4)}, Lng: ${wp.lng.toFixed(4)}
+            </span>
+            <button class="waypoint-remove" onclick="removeWaypoint(${index})">Remove</button>
+        </div>
+    `).join('');
+}
+
+// Remove specific waypoint
+function removeWaypoint(index) {
+    tempWaypoints.splice(index, 1);
+    
+    // Remove marker
+    if (tempWaypointMarkers[index]) {
+        map.removeLayer(tempWaypointMarkers[index]);
+        tempWaypointMarkers.splice(index, 1);
+    }
+    
+    updateWaypointDisplay();
+}
+
+// Clear all waypoints
+function clearWaypoints() {
+    tempWaypoints = [];
+    
+    // Remove all markers
+    tempWaypointMarkers.forEach(marker => map.removeLayer(marker));
+    tempWaypointMarkers = [];
+    
+    updateWaypointDisplay();
+}
+
+// Handle add aircraft form submission
+function handleAddAircraft(e) {
+    e.preventDefault();
+    
+    // Validate minimum waypoints
+    if (tempWaypoints.length < 2) {
+        alert('Please add at least 2 waypoints for the route.');
+        return;
+    }
+    
+    // Get form values
+    const callsign = document.getElementById('aircraftCallsign').value;
+    const speed = parseInt(document.getElementById('aircraftSpeed').value);
+    const startTime = document.getElementById('aircraftStartTime').value;
+    const color = document.getElementById('aircraftColor').value;
+    
+    // Create aircraft object
+    aircraftCounter++;
+    const aircraft = {
+        id: `AC${aircraftCounter}`,
+        callsign: callsign,
+        speed: speed,
+        startTime: `2026-01-01T${startTime}:00Z`,
+        color: color,
+        route: tempWaypoints.map(wp => ({ lat: wp.lat, lng: wp.lng }))
+    };
+    
+    // Send to server
+    socket.emit('addAircraft', aircraft);
+    
+    // Reset form
+    document.getElementById('addAircraftForm').reset();
+    clearWaypoints();
+    
+    // Turn off waypoint mode
+    if (waypointMode) {
+        toggleWaypointMode();
+    }
+}
+
+// Delete aircraft
+function deleteAircraft(aircraftId) {
+    if (!confirm('Are you sure you want to delete this aircraft?')) {
+        return;
+    }
+    
+    socket.emit('deleteAircraft', { id: aircraftId });
+}
+
+// Save mission
+function saveMission() {
+    socket.emit('getMission');
+}
+
+// Download mission file
+function downloadMissionFile(missionData) {
+    const dataStr = JSON.stringify(missionData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mission-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Handle load mission
+function handleLoadMission(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const missionData = JSON.parse(event.target.result);
+            
+            // Validate mission data
+            if (!missionData.aircraft || !Array.isArray(missionData.aircraft)) {
+                throw new Error('Invalid mission format: missing aircraft array');
+            }
+            
+            // Send to server
+            socket.emit('loadMission', missionData);
+            
+            // Reset file input
+            e.target.value = '';
+        } catch (error) {
+            alert('Error loading mission file: ' + error.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Clear all aircraft
+function clearAllAircraft() {
+    if (!confirm('Are you sure you want to clear all aircraft? This cannot be undone.')) {
+        return;
+    }
+    
+    socket.emit('clearAll');
 }
