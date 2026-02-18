@@ -130,35 +130,35 @@
                 </div>
             </div>
 
-            <!-- Aircraft Info Panel -->
+            <!-- Right Column: Aircraft Info Panel -->
             <div class="info-panel">
+                <!-- Conflict Alerts Panel -->
+                <div id="conflict-panel" class="conflict-panel">
+                    <h3>⚠️ Conflict Alerts <span id="conflict-count" class="badge" style="display: none;">0</span></h3>
+                    <div id="conflict-list"></div>
+                </div>
+
+                <!-- Distance Matrix Panel -->
+                <div id="distance-panel" class="distance-panel">
+                    <h3>📏 Separation</h3>
+                    <button id="toggle-distances-btn" class="btn btn-secondary btn-small">Show Matrix</button>
+                    <div id="distance-matrix" style="display: none;"></div>
+                </div>
+                
+                <!-- Real-Time Separation Monitor -->
+                <div id="separation-panel" class="separation-panel">
+                    <h3>🎯 Separation Monitor</h3>
+                    <div id="closest-pair-display"></div>
+                    <div class="all-pairs">
+                        <h4>All Aircraft Pairs:</h4>
+                        <div id="all-pairs-list"></div>
+                    </div>
+                </div>
+                
                 <h3>Active Aircraft</h3>
                 <div id="aircraftList"></div>
             </div>
         </div>
-            
-            <!-- Conflict Alerts Panel -->
-            <div id="conflict-panel" class="conflict-panel">
-                <h3>⚠️ Conflict Alerts <span id="conflict-count" class="badge" style="display: none;">0</span></h3>
-                <div id="conflict-list"></div>
-            </div>
-
-            <!-- Distance Matrix Panel -->
-            <div id="distance-panel" class="distance-panel">
-                <h3>📏 Separation</h3>
-                <button id="toggle-distances-btn" class="btn btn-secondary btn-small">Show Matrix</button>
-                <div id="distance-matrix" style="display: none;"></div>
-            </div>
-            
-            <!-- Real-Time Separation Monitor -->
-            <div id="separation-panel" class="separation-panel">
-                <h3>🎯 Separation Monitor</h3>
-                <div id="closest-pair-display"></div>
-                <div class="all-pairs">
-                    <h4>All Aircraft Pairs:</h4>
-                    <div id="all-pairs-list"></div>
-                </div>
-            </div>
     </div>
 
     <!-- Socket.io Client -->
