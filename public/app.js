@@ -119,9 +119,9 @@ function initializeMap() {
         maxZoom: 19
     });
 
-    const tonerLayer = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}.png', {
-        attribution: 'Map tiles by Stamen Design, under CC BY 3.0.',
-        maxZoom: 20
+    const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri',
+        maxZoom: 19
     });
 
     // Add simple basemap selector so users can switch to higher-contrast maps
@@ -129,9 +129,10 @@ function initializeMap() {
         const baseMaps = {
             'OSM Standard': osmLayer,
             'CartoDB Voyager': posLayer,
-            'Stamen Toner Lite': tonerLayer
+            'Satellite (Esri)': esriSat
         };
-        L.control.layers(baseMaps, {}, { position: 'topright' }).addTo(map);
+        // keep a reference for adding custom layers later
+        window.baseLayerControl = L.control.layers(baseMaps, {}, { position: 'topright' }).addTo(map);
     } catch (e) {
         // ignore if control fails
     }
@@ -405,6 +406,8 @@ function initializeControls() {
     });
     // Add airspace toggle control
     try { addAirspaceControl(); } catch (e) {}
+    // Add custom tile control (satellite / aviation tiles)
+    try { addCustomTileControl(); } catch (e) {}
 }
 
 // Simulation control functions
@@ -1383,6 +1386,59 @@ function addAirspaceControl() {
             airspaceVisible = e.target.checked;
             if (airspaceVisible) addAirspaceLayer(); else removeAirspaceLayer();
         });
+    }, 50);
+}
+
+// Add a small control to paste a custom tile URL (useful for aviation tile providers/WMS)
+function addCustomTileControl() {
+    const CustomControl = L.Control.extend({
+        onAdd: function(map) {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            container.style.background = 'white';
+            container.style.padding = '6px';
+            container.style.fontSize = '13px';
+            container.title = 'Add custom tile layer (paste tile URL)';
+            container.innerHTML = `<button id="addCustomTileBtn" style="background:none;border:none;cursor:pointer;padding:0;margin:0;font-weight:600;color:#222">Tiles+</button>`;
+            L.DomEvent.disableClickPropagation(container);
+            return container;
+        }
+    });
+
+    map.addControl(new CustomControl({ position: 'topright' }));
+
+    setTimeout(() => {
+        const btn = document.getElementById('addCustomTileBtn');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const url = prompt('Enter tile URL (use {z}/{x}/{y} tokens) or WMS tile endpoint:');
+            if (!url) return;
+            const name = prompt('Layer name (display in layer switcher):', 'Custom Tiles');
+            try {
+                const tile = L.tileLayer(url, { maxZoom: 20 });
+                tile.addTo(map);
+                if (window.baseLayerControl) {
+                    window.baseLayerControl.addBaseLayer(tile, name || 'Custom Tiles');
+                } else {
+                    // fallback: add simple overlay control
+                    L.control.layers({}, { [name || 'Custom Tiles']: tile }, { position: 'topright' }).addTo(map);
+                }
+                // persist last custom URL for this session
+                try { localStorage.setItem('lastCustomTile', url); } catch (e) {}
+            } catch (e) {
+                alert('Failed to add tile layer. Check URL and CORS.');
+            }
+        });
+        // If a saved custom tile exists, offer to add it silently
+        try {
+            const last = localStorage.getItem('lastCustomTile');
+            if (last) {
+                const auto = confirm('Restore last custom tile layer?');
+                if (auto) {
+                    const tile = L.tileLayer(last, { maxZoom: 20 }).addTo(map);
+                    if (window.baseLayerControl) window.baseLayerControl.addBaseLayer(tile, 'Restored Custom Tiles');
+                }
+            }
+        } catch (e) {}
     }, 50);
 }
 
