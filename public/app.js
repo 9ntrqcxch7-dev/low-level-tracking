@@ -296,20 +296,33 @@ function initializeWebSocket() {
         const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const locked = serverSyncLockUntil && now < serverSyncLockUntil;
 
-        // If server provides numeric simulation time (seconds), sync our slider and currentTime
+        // If server provides numeric simulation time (seconds), reconcile with our local time
         if (typeof data.time === 'number') {
             if (!locked) {
-                // Server time is mission-relative seconds; map to our day-slider by offsetting from DAY_START_HOUR
-                currentTime = data.time;
+                const serverTime = data.time;
                 try {
+                    // If client is not currently playing, follow server exactly
+                    if (!isPlaying) {
+                        currentTime = serverTime;
+                    } else {
+                        // When playing, smoothly blend small differences, snap on large jumps
+                        const diff = serverTime - currentTime;
+                        const absDiff = Math.abs(diff);
+                        if (absDiff > 5) {
+                            // server is far ahead/behind — snap to server time
+                            currentTime = serverTime;
+                        } else {
+                            // small difference — nudge towards server time (20% of gap)
+                            currentTime += diff * 0.2;
+                        }
+                    }
+
                     const ts = document.getElementById('timeSlider');
                     const tv = document.getElementById('timeValue');
                     if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + Math.round(currentTime));
                     if (tv) tv.textContent = formatTimeOfDay((DAY_START_HOUR * 3600) + currentTime);
                 } catch (e) {}
                 updateTimeDisplay();
-            } else {
-                // ignore server time update while locked to prevent flicker
             }
         } else {
             if (!locked) updateTimeDisplay(data.time);
