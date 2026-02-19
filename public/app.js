@@ -34,12 +34,13 @@ const DEFAULT_ARRIVAL_ALTITUDE = 1000;
 const DAY_START_HOUR = 7; // 07:00 UTC
 const DAY_END_HOUR = 22;  // 22:00 UTC
 
-// Helper: format seconds-since-midnight to HH:MM UTC
+// Helper: format seconds-since-midnight to HH:MM:SS UTC
 function formatTimeOfDay(secondsSinceMidnight) {
     const s = Math.floor(secondsSinceMidnight || 0);
     const hh = Math.floor((s % 86400) / 3600).toString().padStart(2, '0');
     const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
-    return `${hh}:${mm} UTC`;
+    const ss = Math.floor(s % 60).toString().padStart(2, '0');
+    return `${hh}:${mm}:${ss} UTC`;
 }
 
 // Haversine distance (meters) between two lat/lon points
@@ -295,7 +296,7 @@ function initializeWebSocket() {
             try {
                 const ts = document.getElementById('timeSlider');
                 const tv = document.getElementById('timeValue');
-                if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + Number(currentTime.toFixed(1)));
+                if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + Math.round(currentTime));
                 if (tv) tv.textContent = formatTimeOfDay((DAY_START_HOUR * 3600) + currentTime);
             } catch (e) {}
             updateTimeDisplay();
@@ -366,7 +367,7 @@ function initializeControls() {
         // Configure slider as seconds-since-midnight representing a wall-clock time
         timeSlider.min = String(dayStartSec);
         timeSlider.max = String(dayEndSec);
-        timeSlider.step = '0.1'; // 0.1 second steps
+        timeSlider.step = '1'; // 1 second steps for stable scrubbing
 
         timeSlider.addEventListener('input', (e) => {
             // Slider value is seconds since midnight (time-of-day). Map to mission-relative currentTime.
@@ -538,7 +539,7 @@ function initializeMission() {
         if (timeSlider) {
             timeSlider.min = String(dayStartSec);
             timeSlider.max = String(DAY_END_HOUR * 3600);
-            timeSlider.step = '0.1';
+            timeSlider.step = '1';
             // Position slider to day start (mission-relative 0)
             timeSlider.value = String(dayStartSec + Number(currentTime.toFixed ? Number(currentTime.toFixed(1)) : currentTime));
         }
@@ -733,7 +734,7 @@ function play() {
             const ts = document.getElementById('timeSlider');
             const tv = document.getElementById('timeValue');
             const dayStartSec = DAY_START_HOUR * 3600;
-            if (ts && !isScrubbing) ts.value = String(dayStartSec + Number(currentTime.toFixed(1)));
+            if (ts && !isScrubbing) ts.value = String(dayStartSec + Math.round(currentTime));
             if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
         } catch (e) {
             // ignore
@@ -775,7 +776,7 @@ function reset() {
         const ts = document.getElementById('timeSlider');
         const tv = document.getElementById('timeValue');
         const dayStartSec = DAY_START_HOUR * 3600;
-        if (ts) ts.value = String(dayStartSec + Number(currentTime.toFixed(1)));
+        if (ts) ts.value = String(dayStartSec + Math.round(currentTime));
         if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
     } catch (e) {}
 }
