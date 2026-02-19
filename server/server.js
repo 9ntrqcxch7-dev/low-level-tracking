@@ -329,6 +329,8 @@ function updateSimulation() {
       speed: ac.speed || 250,
       departure: ac.departure || '',
       arrival: ac.arrival || '',
+      startTime: ac.startTime || null,
+      route: ac.route || [],
       position: state,
       altitude: state.altitude,
       heading: state.heading,
@@ -532,6 +534,8 @@ io.on('connection', (socket) => {
     if (!simulationRunning) {
       simulationRunning = true;
       simulationSpeed = data.speed || 1;
+      // Log the simulation time at the moment the client requested start
+      console.log('Simulation requested start at server time:', simulationTime.toISOString(), 'speed:', simulationSpeed);
       simulationInterval = setInterval(updateSimulation, 1000);
       console.log('Simulation started');
     }

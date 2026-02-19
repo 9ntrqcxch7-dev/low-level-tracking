@@ -2,61 +2,6 @@
   "mission": "Training Exercise Alpha",
   "aircraft": [
     {
-      "id": "AC001",
-      "callsign": "HAWK-1",
-      "type": "F-16",
-      "speed": 280,
-      "startTime": "2024-01-01T07:00:00Z",
-      "departure": "EGLL",
-      "arrival": "EGLC",
-      "route": [
-        { "lat": 51.505, "lon": -0.09, "alt": 500 },
-        { "lat": 51.510, "lon": -0.08, "alt": 450 },
-        { "lat": 51.515, "lon": -0.07, "alt": 400 },
-        { "lat": 51.520, "lon": -0.06, "alt": 350 },
-        { "lat": 51.525, "lon": -0.05, "alt": 300 },
-        { "lat": 51.530, "lon": -0.04, "alt": 250 }
-      ],
-      "color": "#FF4444"
-    },
-    {
-      "id": "AC002",
-      "callsign": "EAGLE-2",
-      "type": "F-18",
-      "speed": 300,
-      "startTime": "2024-01-01T07:01:00Z",
-      "departure": "EGKK",
-      "arrival": "EGLL",
-      "route": [
-        { "lat": 51.500, "lon": -0.04, "alt": 300 },
-        { "lat": 51.505, "lon": -0.05, "alt": 320 },
-        { "lat": 51.510, "lon": -0.06, "alt": 340 },
-        { "lat": 51.515, "lon": -0.07, "alt": 360 },
-        { "lat": 51.520, "lon": -0.08, "alt": 380 },
-        { "lat": 51.525, "lon": -0.09, "alt": 400 }
-      ],
-      "color": "#4444FF"
-    },
-    {
-      "id": "AC003",
-      "callsign": "VIPER-3",
-      "type": "A-10",
-      "speed": 220,
-      "startTime": "2024-01-01T07:02:00Z",
-      "departure": "EGSS",
-      "arrival": "EGLF",
-      "route": [
-        { "lat": 51.530, "lon": -0.09, "alt": 200 },
-        { "lat": 51.528, "lon": -0.08, "alt": 220 },
-        { "lat": 51.526, "lon": -0.07, "alt": 240 },
-        { "lat": 51.524, "lon": -0.06, "alt": 260 },
-        { "lat": 51.522, "lon": -0.05, "alt": 280 },
-        { "lat": 51.520, "lon": -0.04, "alt": 300 }
-      ],
-      "color": "#44FF44"
-    }
-    ,
-    {
       "id": "AC004",
       "callsign": "FALCON-4",
       "type": "Gripen",
@@ -69,6 +14,34 @@
         { "lat": 59.897301, "lon": 17.588600, "alt": 1000 }
       ],
       "color": "#FFAA00"
+    },
+    {
+      "id": "AC005",
+      "callsign": "GHOST-3",
+      "type": "Gripen",
+      "speed": 310,
+      "startTime": "2024-01-01T07:10:00Z",
+      "departure": "ESCF",
+      "arrival": "ESOK",
+      "route": [
+        { "lat": 59.3789, "lon": 17.5861, "alt": 3000 },
+        { "lat": 59.4447, "lon": 13.3374, "alt": 1000 }
+      ],
+      "color": "#00AACC"
+    },
+    {
+      "id": "AC006",
+      "callsign": "SPIDER-5",
+      "type": "Gripen",
+      "speed": 315,
+      "startTime": "2024-01-01T07:15:00Z",
+      "departure": "ESDF",
+      "arrival": "ESCM",
+      "route": [
+        { "lat": 56.2667, "lon": 15.2650, "alt": 3000 },
+        { "lat": 59.897301, "lon": 17.588600, "alt": 1000 }
+      ],
+      "color": "#AA00FF"
     }
   ]
 }
