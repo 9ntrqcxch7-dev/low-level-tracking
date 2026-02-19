@@ -87,6 +87,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWebSocket();
     initializeControls();
     initializeMissionEditor();
+    // Setup color preview for mission editor color picker
+    try {
+        const colorInput = document.getElementById('aircraftColor');
+        const preview = document.getElementById('aircraftColorPreview');
+        if (colorInput && preview) {
+            const setPreview = () => { preview.style.background = colorInput.value || '#000'; };
+            setPreview();
+            colorInput.addEventListener('input', setPreview);
+        }
+    } catch (e) { /* ignore in older browsers */ }
 });
 
 // Initialize Leaflet map
@@ -516,12 +526,13 @@ function updateAircraftList(aircraftArray) {
             listEl.innerHTML = '<div class="no-aircraft">No active aircraft</div>';
             return;
         }
+        // Ensure route times are present so start/end estimates work
+        aircraftArray.forEach(a => { try { ensureRouteTimes(a); } catch(e){} });
         
         listEl.innerHTML = aircraftArray.map(ac => {
             const status = ac.position?.active ? '✓ Active' : '○ Waiting';
-            
             // Determine vertical speed indicator
-            let vspeedIndicator = '➡️';
+            let vspeedIndicator = '→';
             let vspeedClass = 'level';
             if (ac.verticalSpeed > 100) {
                 vspeedIndicator = '🔼';
@@ -530,7 +541,6 @@ function updateAircraftList(aircraftArray) {
                 vspeedIndicator = '🔽';
                 vspeedClass = 'descending';
             }
-            
             const altitudeDisplay = ac.altitude ? `
                 <div class="altitude-display">
                     <span class="altitude-indicator ${vspeedClass}">${vspeedIndicator}</span>
@@ -540,19 +550,55 @@ function updateAircraftList(aircraftArray) {
                       : ''}
                 </div>
             ` : '';
-            
+            // Format start and end time
+            let startTimeStr = ac.startTime ? new Date(ac.startTime).toLocaleString() : '-';
+            let endTimeStr = '-';
+            if (ac.route && ac.route.length > 1 && ac.startTime) {
+                // If route times are available, use them
+                let lastTime = ac.route[ac.route.length - 1].time;
+                if (typeof lastTime === 'number' && !isNaN(lastTime)) {
+                    let endDate = new Date(new Date(ac.startTime).getTime() + lastTime * 1000);
+                    endTimeStr = endDate.toLocaleString();
+                } else if (ac.speed) {
+                    // Fallback: estimate by distance
+                    let totalNm = 0;
+                    for (let i = 0; i < ac.route.length - 1; i++) {
+                        const p1 = ac.route[i];
+                        const p2 = ac.route[i+1];
+                        const meters = haversineMeters(p1.lat, p1.lon, p2.lat, p2.lon);
+                        totalNm += meters / 1852;
+                    }
+                    let hours = totalNm / ac.speed;
+                    let endDate = new Date(new Date(ac.startTime).getTime() + hours * 3600 * 1000);
+                    endTimeStr = endDate.toLocaleString();
+                }
+            }
+            // Position info
+            let lat = ac.position && typeof ac.position.lat === 'number' ? ac.position.lat.toFixed(4) : '';
+            let lon = ac.position && typeof ac.position.lon === 'number' ? ac.position.lon.toFixed(4) : '';
+            let alt = ac.altitude ? ac.altitude.toLocaleString() : '';
+            let heading = ac.position && typeof ac.position.heading === 'number' ? ac.position.heading.toFixed(0) + '°' : '';
             return `
                 <div class="aircraft-card">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                         <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
                             <div class="aircraft-marker" style="background-color: ${ac.color}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #333;"></div>
                             <div style="flex: 1;">
-                                <div style="font-weight: bold;">${ac.callsign}</div>
+                                <div class="aircraft-callsign">${ac.callsign}</div>
                                 <div style="font-size: 11px; color: #95a5a6;">${status}</div>
                                 ${altitudeDisplay}
+                                <div style="font-size: 11px; color: #888; margin-top: 2px;">
+                                    <span><b>Start:</b> ${startTimeStr || '-'}</span><br/>
+                                    <span><b>End:</b> ${endTimeStr || '-'}</span>
+                                </div>
+                                <div style="font-size: 11px; color: #888; margin-top: 2px;">
+                                    <span><b>Lat:</b> ${lat}</span> <span><b>Lon:</b> ${lon}</span><br/>
+                                    <span><b>Alt:</b> ${alt} ft</span> <span><b>Hdg:</b> ${heading}</span><br/>
+                                    <span><b>Speed:</b> ${ac.speed ? ac.speed : '-'} kts</span>
+                                </div>
                             </div>
                         </div>
-                        <button class="btn btn-danger btn-small" onclick="deleteAircraft('${ac.id}')">🗑️</button>
+                        <button class="delete-btn" onclick="deleteAircraft('${ac.id}')" title="Delete">✖</button>
                     </div>
                 </div>
             `;
@@ -582,14 +628,12 @@ function updateAircraftList(aircraftArray) {
                     <span class="value">${currentPos.lon.toFixed(4)}°</span>
                     <span class="label">Altitude:</span>
                     <span class="value">${currentPos.alt} ft</span>
+                    <span class="label">Speed:</span>
+                    <span class="value">${aircraft.speed || '-'} kts</span>
                     <span class="label">Status:</span>
                     <span class="value">${currentTime >= getMaxTime(aircraft) ? '✅ Complete' : '▲ In Flight'}</span>
                 </div>
-                <div class="aircraft-actions">
-                    <button class="icon-btn btn-delete" onclick="deleteAircraft('${aircraft.id}')">
-                        🗑️ Delete
-                    </button>
-                </div>
+                <button class="delete-btn" onclick="deleteAircraft('${aircraft.id}')" title="Delete">✖</button>
             </div>
         `;
     }).join('');
@@ -1028,7 +1072,7 @@ function updateAircraftDisplay(aircraft) {
         const status = ac.position?.active ? '✓ Active' : '○ Waiting';
         
         // Determine vertical speed indicator
-        let vspeedIndicator = '➡️';
+        let vspeedIndicator = '→';
         let vspeedClass = 'level';
         if (ac.verticalSpeed > 100) {
             vspeedIndicator = '🔼';
