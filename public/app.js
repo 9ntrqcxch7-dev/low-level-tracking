@@ -17,6 +17,9 @@ let waypointMode = false;
 let tempWaypoints = [];
 let tempWaypointMarkers = [];
 let aircraftCounter = 0;
+// Preview markers for mission editor departure/arrival fields
+let departurePreviewMarker = null;
+let arrivalPreviewMarker = null;
 
 // Conflict and Distance state
 let showDistanceMatrix = false;
@@ -1129,6 +1132,12 @@ function initializeMissionEditor() {
     
     // Initialize waypoint display
     updateWaypointDisplay();
+
+    // Airport preview inputs: show markers for entered departure/arrival ICAO codes
+    const depInput = document.getElementById('aircraftDeparture');
+    const arrInput = document.getElementById('aircraftArrival');
+    if (depInput) depInput.addEventListener('input', updateDeparturePreview);
+    if (arrInput) arrInput.addEventListener('input', updateArrivalPreview);
     
     // Waypoint mode toggle
     const addWaypointBtn = document.getElementById('addWaypointBtn');
@@ -1209,6 +1218,79 @@ function handleMapClick(e) {
     tempWaypointMarkers.push(marker);
     
     updateWaypointDisplay();
+}
+
+// Update departure preview marker based on input field value
+function updateDeparturePreview() {
+    try {
+        const code = document.getElementById('aircraftDeparture')?.value || '';
+        const ap = code ? getAirportCoordinates(code) : null;
+        if (!ap) {
+            if (departurePreviewMarker) {
+                try { map.removeLayer(departurePreviewMarker); } catch (e) {}
+                departurePreviewMarker = null;
+            }
+            return;
+        }
+
+        // Create or move preview marker
+        if (departurePreviewMarker) {
+            departurePreviewMarker.setLatLng([ap.lat, ap.lon]);
+            departurePreviewMarker.setPopupContent(`<strong>${code.toUpperCase()}</strong><br>${ap.name}`);
+        } else {
+            departurePreviewMarker = L.circleMarker([ap.lat, ap.lon], {
+                radius: 8,
+                color: '#0055aa',
+                fillColor: '#0055aa',
+                weight: 2,
+                fillOpacity: 0.9
+            }).addTo(map);
+            departurePreviewMarker.bindPopup(`<strong>${code.toUpperCase()}</strong><br>${ap.name}`);
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
+// Update arrival preview marker based on input field value
+function updateArrivalPreview() {
+    try {
+        const code = document.getElementById('aircraftArrival')?.value || '';
+        const ap = code ? getAirportCoordinates(code) : null;
+        if (!ap) {
+            if (arrivalPreviewMarker) {
+                try { map.removeLayer(arrivalPreviewMarker); } catch (e) {}
+                arrivalPreviewMarker = null;
+            }
+            return;
+        }
+
+        if (arrivalPreviewMarker) {
+            arrivalPreviewMarker.setLatLng([ap.lat, ap.lon]);
+            arrivalPreviewMarker.setPopupContent(`<strong>${code.toUpperCase()}</strong><br>${ap.name}`);
+        } else {
+            arrivalPreviewMarker = L.circleMarker([ap.lat, ap.lon], {
+                radius: 8,
+                color: '#007700',
+                fillColor: '#009900',
+                weight: 2,
+                fillOpacity: 0.9
+            }).addTo(map);
+            arrivalPreviewMarker.bindPopup(`<strong>${code.toUpperCase()}</strong><br>${ap.name}`);
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
+// Remove both preview markers
+function removeAirportPreviews() {
+    try {
+        if (departurePreviewMarker) { map.removeLayer(departurePreviewMarker); departurePreviewMarker = null; }
+    } catch (e) {}
+    try {
+        if (arrivalPreviewMarker) { map.removeLayer(arrivalPreviewMarker); arrivalPreviewMarker = null; }
+    } catch (e) {}
 }
 
 // Update waypoint list display
@@ -1334,6 +1416,8 @@ function handleAddAircraft(e) {
     // Reset form
     document.getElementById('addAircraftForm').reset();
     clearWaypoints();
+    // Remove any preview markers shown for departure/arrival
+    removeAirportPreviews();
     
     // Turn off waypoint mode
     if (waypointMode) {
