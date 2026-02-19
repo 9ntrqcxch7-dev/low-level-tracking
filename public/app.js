@@ -6,6 +6,9 @@ let militaryMarkers = {};
 let missionData = null;
 let aircraftMarkers = {};
 let aircraftPaths = {};
+// Airspace layer (airport control zones)
+let airspaceLayer = null;
+let airspaceVisible = false;
 let isPlaying = false;
 let currentTime = 0;
 let playbackSpeed = 1;
@@ -378,6 +381,8 @@ function initializeControls() {
             socket.emit('set-simulation-speed', { speed: playbackSpeed });
         });
     });
+    // Add airspace toggle control
+    try { addAirspaceControl(); } catch (e) {}
 }
 
 // Simulation control functions
@@ -600,6 +605,10 @@ function updateAircraftList(aircraftArray) {
                                     <span><b>Alt:</b> ${alt} ft</span> <span><b>Hdg:</b> ${heading}</span><br/>
                                     <span><b>Speed:</b> ${ac.speed ? ac.speed : '-'} kts</span>
                                 </div>
+                                <div style="font-size:11px;color:#666;margin-top:6px;">
+                                    <span><b>Dep:</b> ${ac.departure || '-'} </span>
+                                    <span style="margin-left:12px;"><b>Arr:</b> ${ac.arrival || '-'}</span>
+                                </div>
                             </div>
                         </div>
                         <button class="delete-btn" onclick="deleteAircraft('${ac.id}')" title="Delete">✖</button>
@@ -636,6 +645,10 @@ function updateAircraftList(aircraftArray) {
                     <span class="value">${aircraft.speed || '-'} kts</span>
                     <span class="label">Status:</span>
                     <span class="value">${currentTime >= getMaxTime(aircraft) ? '✅ Complete' : '▲ In Flight'}</span>
+                    <div style="font-size:11px;color:#666;margin-top:6px;">
+                        <span><b>Dep:</b> ${aircraft.departure || '-'}</span>
+                        <span style="margin-left:12px;"><b>Arr:</b> ${aircraft.arrival || '-'}</span>
+                    </div>
                 </div>
                 <button class="delete-btn" onclick="deleteAircraft('${aircraft.id}')" title="Delete">✖</button>
             </div>
@@ -1291,6 +1304,64 @@ function removeAirportPreviews() {
     try {
         if (arrivalPreviewMarker) { map.removeLayer(arrivalPreviewMarker); arrivalPreviewMarker = null; }
     } catch (e) {}
+}
+
+// Add a basic airspace layer (control zones) around known airports
+function addAirspaceLayer() {
+    if (!window.SWEDISH_AIRPORTS || !map) return;
+    if (!airspaceLayer) airspaceLayer = L.layerGroup().addTo(map);
+    airspaceLayer.clearLayers();
+
+    Object.keys(SWEDISH_AIRPORTS).forEach(code => {
+        const ap = SWEDISH_AIRPORTS[code];
+        if (!ap || !ap.lat || !ap.lon) return;
+        // radius in meters; allow override via airport.controlRadius, default 5000m
+        const radius = ap.controlRadius || 5000;
+        const circle = L.circle([ap.lat, ap.lon], {
+            radius: radius,
+            color: '#ff8800',
+            fillColor: '#ffcc88',
+            fillOpacity: 0.12,
+            weight: 2
+        }).addTo(airspaceLayer);
+        circle.bindPopup(`<strong>${code}</strong><br>${ap.name}<br>CTR ≈ ${Math.round(radius/1000)} km`);
+    });
+}
+
+function removeAirspaceLayer() {
+    try {
+        if (airspaceLayer) {
+            airspaceLayer.clearLayers();
+            map.removeLayer(airspaceLayer);
+            airspaceLayer = null;
+        }
+    } catch (e) {}
+}
+
+// Add a small map control to toggle the airspace layer
+function addAirspaceControl() {
+    const AirspaceControl = L.Control.extend({
+        onAdd: function(map) {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            container.style.background = 'white';
+            container.style.padding = '6px';
+            container.style.fontSize = '13px';
+            container.innerHTML = `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input id="toggleAirspace" type="checkbox">Airspace</label>`;
+            L.DomEvent.disableClickPropagation(container);
+            return container;
+        }
+    });
+
+    map.addControl(new AirspaceControl({ position: 'topright' }));
+    // Wire up change handler
+    setTimeout(() => {
+        const cb = document.getElementById('toggleAirspace');
+        if (!cb) return;
+        cb.addEventListener('change', (e) => {
+            airspaceVisible = e.target.checked;
+            if (airspaceVisible) addAirspaceLayer(); else removeAirspaceLayer();
+        });
+    }, 50);
 }
 
 // Update waypoint list display
