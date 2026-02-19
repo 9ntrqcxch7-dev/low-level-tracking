@@ -225,6 +225,12 @@ body {
     }
 }
 
+/* Spacing: add vertical gap between the 'Active Aircraft' header and the cards */
+.center-col > h3 {
+    margin-bottom: 14px;
+    letter-spacing: 0.4px;
+}
+
 /* On small screens make active aircraft a single column */
 @media (max-width: 768px) {
     #aircraftList {
