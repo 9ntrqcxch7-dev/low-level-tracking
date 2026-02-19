@@ -208,24 +208,41 @@ body {
 }
 
 /* Two-column layout for mission editor and aircraft list */
-.editor-aircraft-layout {
+.three-column-layout {
     display: grid;
-    grid-template-columns: 0.85fr 1.15fr; /* mission editor narrower, info panel wider */
+    grid-template-columns: 0.9fr 1.2fr 0.9fr; /* left editor, center active aircraft, right panels */
     gap: 20px;
     align-items: start;
     margin-bottom: 20px;
 }
 
-@media (max-width: 1200px) {
-    .editor-aircraft-layout {
+@media (max-width: 768px) {
+    .three-column-layout {
+        grid-template-columns: 1fr;
+    }
+    .left-col, .center-col, .right-col {
+        width: 100%;
+    }
+}
+
+/* On small screens make active aircraft a single column */
+@media (max-width: 768px) {
+    #aircraftList {
         grid-template-columns: 1fr;
     }
 }
 
 #aircraftList {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr); /* two narrow columns */
     gap: 12px;
+}
+
+/* Make aircraft cards slightly narrower and more compact in the center column */
+.center-col #aircraftList .aircraft-card {
+    width: 100%;
+    padding: 10px;
+    font-size: 0.95rem;
 }
 
 .aircraft-card {
@@ -235,6 +252,10 @@ body {
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.aircraft-card {
+    position: relative; /* allow absolute-positioned delete button */
 }
 
 .aircraft-card:hover {
@@ -332,9 +353,9 @@ body {
     gap: 6px;
     margin-top: 8px;
     padding: 6px 10px;
-    background: rgba(33, 150, 243, 0.08);
-    border-radius: 6px;
-    border-left: 3px solid #2196F3;
+    background: rgba(33, 150, 243, 0.04);
+    border-radius: 8px;
+    border: 1px solid rgba(33,150,243,0.12);
 }
 
 .altitude-indicator {
@@ -351,6 +372,29 @@ body {
 
 .altitude-indicator.level {
     color: #2196F3;
+}
+
+/* Small circular delete button positioned top-right inside aircraft cards */
+.aircraft-card .delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e53935;
+    color: #fff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+.aircraft-card .delete-btn:hover {
+    background: #c62828;
 }
 
 .altitude-value {
@@ -526,6 +570,19 @@ body {
 .form-group {
     margin-bottom: 12px;
 }
+
+/* Color input: show only the chosen swatch and keep layout compact */
+input[type="color"] {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: transparent;
+    cursor: pointer;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border-radius: 6px; border: none; }
 
 .form-group label {
     display: block;

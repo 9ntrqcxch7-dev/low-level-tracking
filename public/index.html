@@ -71,10 +71,10 @@
         <!-- Map Container -->
         <div id="map"></div>
 
-        <!-- Two-Column Layout: Mission Editor + Aircraft List -->
-        <div class="editor-aircraft-layout">
-            <!-- Mission Editor Section -->
-            <div class="mission-editor">
+        <!-- Three-Column Layout: Mission Editor | Active Aircrafts | Panels -->
+        <div class="three-column-layout">
+            <!-- Left: Mission Editor Section -->
+            <div class="mission-editor left-col">
                 <h3 class="editor-header" id="editorToggle">
                     Mission Editor
                     <span class="toggle-icon">▼</span>
@@ -112,7 +112,9 @@
                         
                         <div class="form-group">
                             <label for="aircraftColor">Color:</label>
-                            <input type="color" id="aircraftColor" value="#0000ff" required>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="color" id="aircraftColor" value="#0000ff" required>
+                            </div>
                         </div>
                         
                         <div class="form-group">
@@ -158,8 +160,14 @@
                 </div>
             </div>
 
-            <!-- Right Column: Aircraft Info Panel -->
-            <div class="info-panel">
+            <!-- Center: Active Aircrafts -->
+            <div class="center-col">
+                <h3>Active Aircraft</h3>
+                <div id="aircraftList"></div>
+            </div>
+
+            <!-- Right: Panels (Conflict, Distance, Separation) -->
+            <div class="right-col info-panel">
                 <!-- Conflict Alerts Panel -->
                 <div id="conflict-panel" class="conflict-panel">
                     <h3>Conflict Alerts <span id="conflict-count" class="badge" style="display: none;">0</span></h3>
@@ -182,9 +190,6 @@
                         <div id="all-pairs-list"></div>
                     </div>
                 </div>
-                
-                <h3>Active Aircraft</h3>
-                <div id="aircraftList"></div>
             </div>
         </div>
     </div>

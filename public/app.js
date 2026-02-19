@@ -87,14 +87,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWebSocket();
     initializeControls();
     initializeMissionEditor();
-    // Setup color preview for mission editor color picker
+    // Style the native color input so only the chosen swatch is visible
     try {
         const colorInput = document.getElementById('aircraftColor');
-        const preview = document.getElementById('aircraftColorPreview');
-        if (colorInput && preview) {
-            const setPreview = () => { preview.style.background = colorInput.value || '#000'; };
-            setPreview();
-            colorInput.addEventListener('input', setPreview);
+        if (colorInput) {
+            const setSwatch = () => { try { colorInput.style.backgroundColor = colorInput.value; } catch (e) {} };
+            setSwatch();
+            colorInput.addEventListener('input', setSwatch);
         }
     } catch (e) { /* ignore in older browsers */ }
 });
@@ -581,10 +580,12 @@ function updateAircraftList(aircraftArray) {
             return `
                 <div class="aircraft-card">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                            <div class="aircraft-marker" style="background-color: ${ac.color}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #333;"></div>
-                            <div style="flex: 1;">
-                                <div class="aircraft-callsign">${ac.callsign}</div>
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <div style="flex: 1;">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <div class="aircraft-color" style="background-color: ${ac.color}; width:16px; height:16px; border-radius:50%; border:2px solid white;"></div>
+                                        <div class="aircraft-callsign">${ac.callsign}</div>
+                                    </div>
                                 <div style="font-size: 11px; color: #95a5a6;">${status}</div>
                                 ${altitudeDisplay}
                                 <div style="font-size: 11px; color: #888; margin-top: 2px;">
