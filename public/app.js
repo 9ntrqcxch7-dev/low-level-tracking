@@ -413,7 +413,10 @@ function initializeControls() {
 
 // Simulation control functions
 function startSimulation() {
-    socket.emit('start-simulation', { speed: playbackSpeed });
+    // Send desired start time so server can start from the scrubber position
+    try { socket.emit('start-simulation', { speed: playbackSpeed, startTime: currentTime }); } catch (e) {}
+    // Also start local playback immediately from our currentTime so play reflects the scrubber
+    try { play(); } catch (e) {}
     document.getElementById('playBtn').disabled = true;
     document.getElementById('pauseBtn').disabled = false;
 }
