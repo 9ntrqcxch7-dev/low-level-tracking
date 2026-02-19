@@ -16,6 +16,10 @@ let animationInterval = null;
 let isScrubbing = false;
 // Temporary lock to ignore server time updates when client has just started playback from scrubber
 let serverSyncLockUntil = 0; // performance.now() timestamp in ms
+// Track last time (ms) we received server position for each aircraft
+const lastServerUpdateMs = {};
+// Track when we last applied a server time correction to avoid rapid small corrections
+let lastServerTimeHandledMs = 0;
 
 // Mission Editor State
 let waypointMode = false;
@@ -35,6 +39,8 @@ const DEFAULT_CRUISE_ALTITUDE = 3000;
 const DEFAULT_ARRIVAL_ALTITUDE = 1000;
 const DAY_START_HOUR = 7; // 07:00 UTC
 const DAY_END_HOUR = 22;  // 22:00 UTC
+// If the server has updated an aircraft within this window, prefer server positions
+const SERVER_IGNORE_WINDOW_MS = 3000;
 
 // Helper: format seconds-since-midnight to HH:MM:SS UTC
 function formatTimeOfDay(secondsSinceMidnight) {
@@ -301,26 +307,33 @@ function initializeWebSocket() {
             if (!locked) {
                 const serverTime = data.time;
                 try {
-                    // If client is not currently playing, follow server exactly
+                    const nowMs = Date.now();
+                    // If client is not currently playing, follow server exactly and mark handled
                     if (!isPlaying) {
                         currentTime = serverTime;
+                        lastServerTimeHandledMs = nowMs;
                     } else {
-                        // When playing, smoothly blend small differences, snap on large jumps
-                        const diff = serverTime - currentTime;
-                        const absDiff = Math.abs(diff);
-                        if (absDiff > 10) {
-                            // server is far ahead/behind — snap to server time
-                            currentTime = serverTime;
-                        } else {
-                            // small difference — nudge towards server time (20% of gap)
-                            currentTime += diff * 0.1;
+                        // When playing, rate-limit corrections to avoid rapid small nudges that cause flicker
+                        const sinceLast = nowMs - (lastServerTimeHandledMs || 0);
+                        if (sinceLast > 800) {
+                            const diff = serverTime - currentTime;
+                            const absDiff = Math.abs(diff);
+                            if (absDiff > 10) {
+                                // server is far ahead/behind — snap to server time
+                                currentTime = serverTime;
+                            } else {
+                                // small difference — nudge towards server time (10% of gap)
+                                currentTime += diff * 0.1;
+                            }
+                            lastServerTimeHandledMs = nowMs;
                         }
                     }
 
                     const ts = document.getElementById('timeSlider');
                     const tv = document.getElementById('timeValue');
-                    if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + Math.round(currentTime));
-                    if (tv) tv.textContent = formatTimeOfDay((DAY_START_HOUR * 3600) + currentTime);
+                    const dayStartSec = DAY_START_HOUR * 3600;
+                    if (ts && !isScrubbing) ts.value = String(dayStartSec + Math.round(currentTime));
+                    if (tv) tv.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
                 } catch (e) {}
                 updateTimeDisplay();
             }
@@ -331,6 +344,11 @@ function initializeWebSocket() {
         // If locked, skip updating positions and derived UI that would conflict with local playback
         if (locked) return;
 
+        // Record server timestamps for per-aircraft updates and forward positions
+        if (Array.isArray(data.aircraft)) {
+            const nowMs = Date.now();
+            data.aircraft.forEach(ac => { if (ac && ac.id) lastServerUpdateMs[ac.id] = nowMs; });
+        }
         updateAircraftPositions(data.aircraft);
         updateConflictAlerts(data.conflicts || []);
         if (showDistanceMatrix) {
@@ -580,7 +598,7 @@ function initializeMission() {
             // Position slider to day start (mission-relative 0)
             timeSlider.value = String(dayStartSec + Number(currentTime.toFixed ? Number(currentTime.toFixed(1)) : currentTime));
         }
-        if (timeValue) timeValue.textContent = formatTimeOfDay(dayStartSec + currentTime);
+        if (timeValue) timeValue.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
     } catch (e) {
         // ignore if DOM not ready
     }
@@ -773,7 +791,7 @@ function play() {
             const tv = document.getElementById('timeValue');
             const dayStartSec = DAY_START_HOUR * 3600;
             if (ts && !isScrubbing) ts.value = String(dayStartSec + Math.round(currentTime));
-            if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
+            if (tv) tv.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
         } catch (e) {
             // ignore
         }
@@ -788,7 +806,7 @@ function play() {
         updateAircraftPositions();
         updateTimeDisplay();
         if (!isScrubbing) updateAircraftList();
-    }, 100);
+    }, 1000);
 }
 
 // Pause animation
@@ -815,7 +833,7 @@ function reset() {
         const tv = document.getElementById('timeValue');
         const dayStartSec = DAY_START_HOUR * 3600;
         if (ts) ts.value = String(dayStartSec + Math.round(currentTime));
-        if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
+        if (tv) tv.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
     } catch (e) {}
 }
 
@@ -984,7 +1002,15 @@ function updateAircraftPositions(aircraftData) {
         const pos = getCurrentPosition(aircraft, currentTime);
         const marker = aircraftMarkers[aircraft.id];
         if (marker) {
-            marker.setLatLng([pos.lat, pos.lon]);
+            // If the server recently provided a position for this aircraft, prefer that and skip
+            // client-side mission-driven updates for a short window to avoid flicker.
+            const nowMs = Date.now();
+            const lastServerMs = lastServerUpdateMs[aircraft.id] || 0;
+            if (lastServerMs && (nowMs - lastServerMs) < SERVER_IGNORE_WINDOW_MS) {
+                // Skip updating this marker — server position is fresher
+            } else {
+                marker.setLatLng([pos.lat, pos.lon]);
+            }
             marker.setPopupContent(`
                 <div class="popup-aircraft-info">
                     <h4>${aircraft.callsign}</h4>
@@ -1002,13 +1028,34 @@ function updateAircraftPositions(aircraftData) {
 function updateTimeDisplay(time) {
     const displayEl = document.getElementById('timeDisplay');
     if (time) {
-        // If time is an ISO string from simulation
-        const timeObj = new Date(time);
-        displayEl.textContent = `Time: ${timeObj.toISOString().split('T')[1].slice(0, 8)}`;
+        try {
+            // Accept ISO string, Date, or numeric seconds-since-midnight
+            if (typeof time === 'number') {
+                // treat as seconds-since-midnight
+                displayEl.textContent = `Time: ${formatTimeOfDay(Math.round(time))}`;
+            } else {
+                const timeObj = new Date(time);
+                if (!isNaN(timeObj.getTime())) {
+                    // Use UTC time-of-day so label remains consistent
+                    const h = timeObj.getUTCHours();
+                    const m = timeObj.getUTCMinutes();
+                    const s = timeObj.getUTCSeconds();
+                    const secondsSinceMidnight = h * 3600 + m * 60 + s;
+                    displayEl.textContent = `Time: ${formatTimeOfDay(secondsSinceMidnight)}`;
+                } else {
+                    // Fallback to currentTime
+                    const dayStartSec = DAY_START_HOUR * 3600;
+                    displayEl.textContent = `Time: ${formatTimeOfDay(dayStartSec + Math.round(currentTime))}`;
+                }
+            }
+        } catch (e) {
+            const dayStartSec = DAY_START_HOUR * 3600;
+            displayEl.textContent = `Time: ${formatTimeOfDay(dayStartSec + Math.round(currentTime))}`;
+        }
     } else {
-        // Show wall-clock time mapped from mission-relative currentTime
+        // Show wall-clock time mapped from mission-relative currentTime (rounded)
         const dayStartSec = DAY_START_HOUR * 3600;
-        displayEl.textContent = `Time: ${formatTimeOfDay(dayStartSec + currentTime)}`;
+        displayEl.textContent = `Time: ${formatTimeOfDay(dayStartSec + Math.round(currentTime))}`;
     }
 }
 
