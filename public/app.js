@@ -295,7 +295,7 @@ function initializeWebSocket() {
             try {
                 const ts = document.getElementById('timeSlider');
                 const tv = document.getElementById('timeValue');
-                if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + currentTime);
+                if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + Number(currentTime.toFixed(1)));
                 if (tv) tv.textContent = formatTimeOfDay((DAY_START_HOUR * 3600) + currentTime);
             } catch (e) {}
             updateTimeDisplay();
@@ -366,7 +366,7 @@ function initializeControls() {
         // Configure slider as seconds-since-midnight representing a wall-clock time
         timeSlider.min = String(dayStartSec);
         timeSlider.max = String(dayEndSec);
-        timeSlider.step = '60'; // 1 minute steps
+        timeSlider.step = '0.1'; // 0.1 second steps
 
         timeSlider.addEventListener('input', (e) => {
             // Slider value is seconds since midnight (time-of-day). Map to mission-relative currentTime.
@@ -538,9 +538,9 @@ function initializeMission() {
         if (timeSlider) {
             timeSlider.min = String(dayStartSec);
             timeSlider.max = String(DAY_END_HOUR * 3600);
-            timeSlider.step = '60';
+            timeSlider.step = '0.1';
             // Position slider to day start (mission-relative 0)
-            timeSlider.value = String(dayStartSec + currentTime);
+            timeSlider.value = String(dayStartSec + Number(currentTime.toFixed ? Number(currentTime.toFixed(1)) : currentTime));
         }
         if (timeValue) timeValue.textContent = formatTimeOfDay(dayStartSec + currentTime);
     } catch (e) {
@@ -733,7 +733,7 @@ function play() {
             const ts = document.getElementById('timeSlider');
             const tv = document.getElementById('timeValue');
             const dayStartSec = DAY_START_HOUR * 3600;
-            if (ts && !isScrubbing) ts.value = String(dayStartSec + currentTime);
+            if (ts && !isScrubbing) ts.value = String(dayStartSec + Number(currentTime.toFixed(1)));
             if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
         } catch (e) {
             // ignore
@@ -775,7 +775,7 @@ function reset() {
         const ts = document.getElementById('timeSlider');
         const tv = document.getElementById('timeValue');
         const dayStartSec = DAY_START_HOUR * 3600;
-        if (ts) ts.value = String(dayStartSec + currentTime);
+        if (ts) ts.value = String(dayStartSec + Number(currentTime.toFixed(1)));
         if (tv) tv.textContent = formatTimeOfDay(dayStartSec + currentTime);
     } catch (e) {}
 }
