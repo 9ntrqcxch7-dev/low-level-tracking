@@ -109,10 +109,32 @@ function initializeMap() {
     // Center map over Sweden for the tactical view
     map = L.map('map').setView([59.3293, 18.0686], 6);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
         maxZoom: 19
     }).addTo(map);
+
+    const posLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CartoDB',
+        maxZoom: 19
+    });
+
+    const tonerLayer = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}.png', {
+        attribution: 'Map tiles by Stamen Design, under CC BY 3.0.',
+        maxZoom: 20
+    });
+
+    // Add simple basemap selector so users can switch to higher-contrast maps
+    try {
+        const baseMaps = {
+            'OSM Standard': osmLayer,
+            'CartoDB Voyager': posLayer,
+            'Stamen Toner Lite': tonerLayer
+        };
+        L.control.layers(baseMaps, {}, { position: 'topright' }).addTo(map);
+    } catch (e) {
+        // ignore if control fails
+    }
 
     // layer to hold military airport markers (cleared/reused to avoid duplicates)
     militaryLayer = L.layerGroup().addTo(map);
@@ -1324,7 +1346,7 @@ function addAirspaceLayer() {
             fillOpacity: 0.12,
             weight: 2
         }).addTo(airspaceLayer);
-        circle.bindPopup(`<strong>${code}</strong><br>${ap.name}<br>CTR ≈ ${Math.round(radius/1000)} km`);
+        circle.bindPopup(`<div style="color:#222"><strong>${code}</strong><br>${ap.name}<br>CTR ≈ ${Math.round(radius/1000)} km</div>`);
     });
 }
 
@@ -1346,7 +1368,7 @@ function addAirspaceControl() {
             container.style.background = 'white';
             container.style.padding = '6px';
             container.style.fontSize = '13px';
-            container.innerHTML = `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input id="toggleAirspace" type="checkbox">Airspace</label>`;
+            container.innerHTML = `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#222;font-weight:600;"><input id="toggleAirspace" type="checkbox">Airspace</label>`;
             L.DomEvent.disableClickPropagation(container);
             return container;
         }
