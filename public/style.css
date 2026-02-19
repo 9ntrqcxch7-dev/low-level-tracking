@@ -736,25 +736,25 @@ input[type="file"] {
     align-items: center;
     margin-bottom: 15px;
     padding-bottom: 12px;
-    border-bottom: 2px solid #eceff1;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 .panel-header h3 {
-    color: #1e3c72;
-    font-size: 1.3em;
-    font-weight: 700;
+    color: #e6eef8;
+    font-size: 1.2em;
+    font-weight: 800;
     margin: 0;
 }
 
 .conflict-panel h3,
 .distance-panel h3,
 .separation-panel h3 {
-    color: #1e3c72;
-    font-size: 1.3em;
-    font-weight: 700;
-    margin: 0 0 15px 0;
-    padding-bottom: 12px;
-    border-bottom: 2px solid #eceff1;
+    color: #e6eef8;
+    font-size: 1.15em;
+    font-weight: 800;
+    margin: 0 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 .conflict-badge {
