@@ -308,12 +308,12 @@ function initializeWebSocket() {
                         // When playing, smoothly blend small differences, snap on large jumps
                         const diff = serverTime - currentTime;
                         const absDiff = Math.abs(diff);
-                        if (absDiff > 5) {
+                        if (absDiff > 10) {
                             // server is far ahead/behind — snap to server time
                             currentTime = serverTime;
                         } else {
                             // small difference — nudge towards server time (20% of gap)
-                            currentTime += diff * 0.2;
+                            currentTime += diff * 0.1;
                         }
                     }
 
@@ -446,7 +446,7 @@ function startSimulation() {
     // Also start local playback immediately from our currentTime so play reflects the scrubber
     try { play(); } catch (e) {}
     // Lock out incoming server updates briefly so client playback doesn't get immediately overwritten
-    try { serverSyncLockUntil = (typeof performance !== 'undefined' && performance.now) ? performance.now() + 1500 : Date.now() + 1500; } catch (e) {}
+    try { serverSyncLockUntil = (typeof performance !== 'undefined' && performance.now) ? performance.now() + 3000 : Date.now() + 3000; } catch (e) {}
     document.getElementById('playBtn').disabled = true;
     document.getElementById('pauseBtn').disabled = false;
 }
@@ -764,8 +764,9 @@ function play() {
     document.getElementById('playBtn').disabled = true;
     document.getElementById('pauseBtn').disabled = false;
     
+    // Advance time in 1s ticks so slider (1s step) and play remain aligned
     animationInterval = setInterval(() => {
-        currentTime += 0.1 * playbackSpeed;
+        currentTime += 1 * playbackSpeed;
         // Reflect time on the scrubber (slider holds seconds-since-midnight)
         try {
             const ts = document.getElementById('timeSlider');
