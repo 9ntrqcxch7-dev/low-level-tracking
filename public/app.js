@@ -91,8 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize Leaflet map
 function initializeMap() {
-    map = L.map('map').setView([51.515, -0.065], 13);
-    
+    // Center map over Sweden for the tactical view
+    map = L.map('map').setView([59.3293, 18.0686], 6);
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
         maxZoom: 19
@@ -1217,6 +1218,7 @@ function handleAddAircraft(e) {
     
     // Get form values
     const callsign = document.getElementById('aircraftCallsign').value;
+    const type = (document.getElementById('aircraftType') && document.getElementById('aircraftType').value) || 'Custom';
     const speed = parseInt(document.getElementById('aircraftSpeed').value);
     const startTime = document.getElementById('aircraftStartTime').value;
     const color = document.getElementById('aircraftColor').value;
@@ -1272,6 +1274,7 @@ function handleAddAircraft(e) {
     const aircraft = {
         id: `AC${aircraftCounter}`,
         callsign: callsign,
+        type: type,
         speed: speed,
         startTime: `2024-01-01T${startTime}:00Z`,
         color: color,

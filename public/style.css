@@ -5,55 +5,80 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%);
-    color: #2c3e50;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(180deg, #0f1724 0%, #0b1a2b 60%);
+    color: #e6eef8;
     min-height: 100vh;
 }
 
 .container {
-    max-width: 1600px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 22px;
 }
 
-header {
-    text-align: center;
-    color: white;
-    margin-bottom: 25px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    padding: 30px;
-    border-radius: 15px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+/* Top navigation */
+.top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    margin-bottom: 14px;
 }
-
-header h1 {
-    font-size: 2.5em;
-    margin-bottom: 10px;
+.top-nav .brand-title {
     font-weight: 700;
-    letter-spacing: 1px;
-    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+    font-size: 18px;
+    color: #ffffff;
+    letter-spacing: 0.6px;
+}
+.top-nav .brand-sub {
+    display: inline-block;
+    margin-left: 8px;
+    font-weight: 500;
+    color: #9fb4d6;
+    font-size: 13px;
+}
+.top-nav .version {
+    background: rgba(255,255,255,0.06);
+    color: #cfe6ff;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.main-header {
+    text-align: left;
+    color: #dbeeff;
+    margin-bottom: 20px;
+    padding: 18px 20px;
+}
+
+.main-header h1 {
+    font-size: 28px;
+    margin-bottom: 6px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
 }
 
 .subtitle {
-    font-size: 1.1em;
-    opacity: 0.95;
-    font-weight: 400;
+    font-size: 14px;
+    color: #9fb4d6;
+    margin-top: 2px;
 }
 
 /* Control Panel */
 .control-panel {
-    background: white;
+    background: rgba(255,255,255,0.04);
     border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 25px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 18px;
+    margin-bottom: 20px;
+    box-shadow: 0 6px 30px rgba(2,8,23,0.6);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 20px;
+    gap: 18px;
 }
 
 .controls-left,
@@ -65,19 +90,20 @@ header h1 {
 }
 
 .btn {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 8px;
+    padding: 10px 18px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.18s ease;
+    background: transparent;
+    color: #e6eef8;
 }
 
 .btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    background: rgba(255,255,255,0.04);
 }
 
 .btn:disabled {
@@ -86,26 +112,21 @@ header h1 {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+    background: linear-gradient(90deg, #1167b1 0%, #0b5fa3 100%);
+    color: #fff;
+    border: none;
 }
 
 .btn-secondary {
-    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-    color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+    background: rgba(255,255,255,0.06);
+    color: #cfe6ff;
+    border: 1px solid rgba(255,255,255,0.04);
 }
 
 .btn-danger {
-    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    background: linear-gradient(90deg, #d93b3b 0%, #b82c2c 100%);
     color: white;
+    border: none;
 }
 
 .btn-small {
@@ -160,10 +181,11 @@ header h1 {
 
 /* Map */
 #map {
-    height: 600px;
+    height: 640px;
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    margin-bottom: 25px;
+    box-shadow: 0 16px 48px rgba(2,8,23,0.7);
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.03);
 }
 
 /* Info Panel */
@@ -176,22 +198,22 @@ header h1 {
 
 .info-panel > h3 {
     margin: 20px 0 15px 0;
-    padding: 15px 20px;
-    color: #1e3c72;
-    font-size: 1.4em;
+    padding: 12px 16px;
+    color: #e6eef8;
+    font-size: 1.1em;
     font-weight: 700;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(2,8,23,0.5);
 }
 
 /* Two-column layout for mission editor and aircraft list */
 .editor-aircraft-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 25px;
+    grid-template-columns: 0.85fr 1.15fr; /* mission editor narrower, info panel wider */
+    gap: 20px;
     align-items: start;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
 }
 
 @media (max-width: 1200px) {
@@ -446,30 +468,31 @@ header h1 {
 
 /* Mission Editor Styles */
 .mission-editor {
-    background: white;
-    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius: 10px;
     margin: 0;
     max-width: none;
     padding: 0;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(2,8,23,0.6);
+    border: 1px solid rgba(255,255,255,0.03);
 }
 
 .editor-header {
-    color: #1e3c72;
-    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    color: #e6eef8;
+    background: rgba(255,255,255,0.02);
     padding: 12px 15px;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-weight: 700;
-    font-size: 1.1em;
-    border-bottom: 2px solid #2196F3;
+    font-size: 1.05em;
+    border-bottom: 2px solid rgba(33,150,243,0.12);
 }
 
 .editor-header:hover {
-    background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
+    background: rgba(255,255,255,0.03);
 }
 
 .toggle-icon {
@@ -482,7 +505,7 @@ header h1 {
 }
 
 .editor-content {
-    padding: 15px;
+    padding: 14px;
 }
 
 .editor-content.hidden {
@@ -516,18 +539,23 @@ header h1 {
 .form-group select {
     width: 100%;
     padding: 8px 10px;
-    border: 2px solid #e0e0e0;
+    border: 1px solid rgba(255,255,255,0.06);
     border-radius: 6px;
     font-size: 13px;
-    transition: all 0.3s ease;
-    background: white;
+    transition: all 0.18s ease;
+    background: rgba(0,0,0,0.25);
+    color: #e6eef8;
+}
+
+.form-group input::placeholder {
+    color: rgba(230,238,248,0.5);
 }
 
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
-    border-color: #2196F3;
-    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+    border-color: rgba(33,150,243,0.8);
+    box-shadow: 0 0 0 4px rgba(11,95,163,0.08);
 }
 
 .form-row {
@@ -544,21 +572,23 @@ header h1 {
 }
 
 .waypoint-list {
-    background: #f8f9fa;
+    background: rgba(255,255,255,0.02);
     border-radius: 6px;
     padding: 10px;
     min-height: 80px;
+    border: 1px solid rgba(255,255,255,0.03);
 }
 
 .waypoint-item {
-    background: white;
+    background: rgba(0,0,0,0.22);
     padding: 6px 10px;
     border-radius: 4px;
     margin-bottom: 6px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 6px 18px rgba(2,8,23,0.6);
+    border: 1px solid rgba(255,255,255,0.02);
 }
 
 .waypoint-coords {
@@ -635,11 +665,12 @@ input[type="file"] {
 .conflict-panel,
 .distance-panel,
 .separation-panel {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    background: rgba(255,255,255,0.02);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+    box-shadow: 0 10px 30px rgba(2,8,23,0.6);
+    border: 1px solid rgba(255,255,255,0.03);
 }
 
 .panel-header {
