@@ -431,21 +431,23 @@ function initializeMission() {
         
         // Create aircraft marker
         const startPos = aircraft.route[0];
-                const initialIconHtml = `
-                                    <div style="position: relative; width: 60px; height: 44px;">
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 0;">
-                                            <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
-                                                <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
-                                            </svg>
+                    const initialIconHtml = `
+                                        <div style="position: relative; width: 140px; height: 44px;">
+                                            <div style="position: absolute; left: 50%; transform: translateX(-50%); top: -15px;">
+                                                <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
+                                                    <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
+                                                </svg>
+                                            </div>
+                                            <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; display:flex; align-items:center; gap:8px; font-size:10px; white-space:nowrap;">
+                                                <div style="font-weight:700; color:#111;">${aircraft.callsign}</div>
+                                                <div style="font-size:10px; color:#555;">FL${String(Math.round(startPos.alt/100)).padStart(3,'0')}</div>
+                                            </div>
                                         </div>
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; font-size: 11px; font-weight: 700; color: #111;">${aircraft.callsign}</div>
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 34px; font-size: 11px; color: #555;">FL${String(Math.round(startPos.alt/100)).padStart(3,'0')}</div>
-                                    </div>
-                                `;
+                                    `;
 
                 const marker = L.marker([startPos.lat, startPos.lon], {
-                        icon: L.divIcon({ className: 'aircraft-marker', html: initialIconHtml, iconSize: [60, 44], iconAnchor: [30, 0] })
-                }).addTo(map);
+            icon: L.divIcon({ className: 'aircraft-marker', html: initialIconHtml, iconSize: [140, 44], iconAnchor: [70, 0] })
+        }).addTo(map);
         
         marker.bindPopup(`
             <div class="popup-aircraft-info">
@@ -717,18 +719,20 @@ function updateAircraftPositions(aircraftData) {
                 
                                 // Create custom SVG triangle icon with labels; anchor at the triangle tip (top center)
                                 const iconHtml = `
-                                    <div style="position: relative; width: 60px; height: 44px;">
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 0;">
+                                    <div style="position: relative; width: 140px; height: 44px;">
+                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: -10px;">
                                             <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
                                                 <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
                                             </svg>
                                         </div>
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; font-size: 11px; font-weight: 700; color: #111;">${aircraft.callsign}</div>
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 34px; font-size: 11px; color: #555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
+                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap;">
+                                            <div style="font-weight:700; color:#111;">${aircraft.callsign}</div>
+                                            <div style="font-size:11px; color:#555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
+                                        </div>
                                     </div>
                                 `;
 
-                                const icon = L.divIcon({ className: 'aircraft-marker-icon', html: iconHtml, iconSize: [60, 44], iconAnchor: [30, 0] });
+                                const icon = L.divIcon({ className: 'aircraft-marker-icon', html: iconHtml, iconSize: [140, 44], iconAnchor: [70, 0] });
 
                 const marker = L.marker([lat, lon], { icon: icon }).addTo(map);
 
@@ -787,20 +791,22 @@ function updateAircraftPositions(aircraftData) {
                 const flightLevel = Math.round(aircraft.altitude / 100);
                 const altDisplay = `FL${String(flightLevel).padStart(3, '0')}`;
                 
-                                // Update icon with new altitude and heading (triangle anchored at tip)
+                                // Update icon with new altitude and heading — unify with initial icon sizing/anchor
                                 const updatedIconHtml = `
-                                    <div style="position: relative; width: 60px; height: 44px;">
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 0;">
+                                    <div style="position: relative; width: 140px; height: 44px;">
+                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: -10px;">
                                             <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
                                                 <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
                                             </svg>
                                         </div>
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; font-size: 11px; font-weight: 700; color: #111;">${aircraft.callsign}</div>
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 34px; font-size: 11px; color: #555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
+                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap;">
+                                            <div style="font-weight:700; color:#111;">${aircraft.callsign}</div>
+                                            <div style="font-size:11px; color:#555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
+                                        </div>
                                     </div>
                                 `;
 
-                                const icon = L.divIcon({ className: 'aircraft-marker-icon', html: updatedIconHtml, iconSize: [60, 44], iconAnchor: [30, 0] });
+                                const icon = L.divIcon({ className: 'aircraft-marker-icon', html: updatedIconHtml, iconSize: [140, 44], iconAnchor: [70, 0] });
                 
                 aircraftMarkers[key].setIcon(icon);
 
@@ -917,12 +923,12 @@ function updateConflictAlerts(conflicts) {
 function updateDistanceMatrix(distances) {
     const matrixEl = document.getElementById('distance-matrix');
     if (!matrixEl) return;
-    
-    if (distances.length === 0) {
+
+    if (!distances || distances.length === 0) {
         matrixEl.innerHTML = '<div style="color: #95a5a6; font-size: 12px;">No active aircraft pairs</div>';
         return;
     }
-    
+
     matrixEl.innerHTML = distances.map(d => `
         <div class="distance-item">
             <div class="distance-pair">
@@ -981,7 +987,7 @@ function updateSeparationMonitor(separations) {
     allPairsEl.innerHTML = separations.map(sep => {
         let statusClass = 'safe';
         let statusIcon = '🟢';
-        
+
         if (sep.horizontal < 3 && sep.vertical < 500) {
             statusClass = 'conflict';
             statusIcon = '🔴';
@@ -989,7 +995,7 @@ function updateSeparationMonitor(separations) {
             statusClass = 'caution';
             statusIcon = '🟡';
         }
-        
+
         return `
             <div class="pair-item ${statusClass}">
                 <span class="pair-names">${sep.aircraft1} ↔ ${sep.aircraft2}</span>
@@ -1034,20 +1040,18 @@ function updateAircraftDisplay(aircraft) {
         const altitudeDisplay = ac.altitude ? `
             <div class="altitude-display">
                 <span class="altitude-indicator ${vspeedClass}">${vspeedIndicator}</span>
-                                    // Create custom SVG triangle icon with labels; anchor at the triangle tip (top center)
-                                    const iconHtml = `
-                                            <div style="position: relative; width: 60px; height: 44px;">
-                                                    <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 0;">
-                                                            <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
-                                                                    <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
-                                                            </svg>
-                                                    </div>
-                                                    <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; font-size: 11px; display:flex; gap:8px; align-items:center;">
-                                                        <div style="font-weight:700; color:#111;">${aircraft.callsign}</div>
-                                                        <div style="color:#555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
-                                                    </div>
-                                            </div>
-                                    `;
+                <span class="altitude-value">${ac.altitude.toLocaleString()} ft</span>
+                ${Math.abs(ac.verticalSpeed || 0) > 100 ? 
+                  `<span style="font-size: 10px;">(${ac.verticalSpeed > 0 ? '+' : ''}${ac.verticalSpeed} ft/min)</span>` 
+                  : ''}
+            </div>
+        ` : '';
+        
+        return `
+            <div class="aircraft-card">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                        <div class="aircraft-marker" style="background-color: ${ac.color}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #333;"></div>
                         <div style="flex: 1;">
                             <div style="font-weight: bold;">${ac.callsign}</div>
                             <div style="font-size: 11px; color: #95a5a6;">${status}</div>
