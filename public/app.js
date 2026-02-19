@@ -14,6 +14,8 @@ let currentTime = 0;
 let playbackSpeed = 1;
 let animationInterval = null;
 let isScrubbing = false;
+// Temporary lock to ignore server time updates when client has just started playback from scrubber
+let serverSyncLockUntil = 0; // performance.now() timestamp in ms
 
 // Mission Editor State
 let waypointMode = false;
@@ -289,20 +291,33 @@ function initializeWebSocket() {
     socket.on('simulation-update', (data) => {
         // If the user is actively scrubbing, ignore server updates to avoid fighting the UI
         if (isScrubbing) return;
+
+        // If we recently started playback from the scrubber, temporarily ignore server time/positions
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const locked = serverSyncLockUntil && now < serverSyncLockUntil;
+
         // If server provides numeric simulation time (seconds), sync our slider and currentTime
         if (typeof data.time === 'number') {
-            // Server time is mission-relative seconds; map to our day-slider by offsetting from DAY_START_HOUR
-            currentTime = data.time;
-            try {
-                const ts = document.getElementById('timeSlider');
-                const tv = document.getElementById('timeValue');
-                if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + Math.round(currentTime));
-                if (tv) tv.textContent = formatTimeOfDay((DAY_START_HOUR * 3600) + currentTime);
-            } catch (e) {}
-            updateTimeDisplay();
+            if (!locked) {
+                // Server time is mission-relative seconds; map to our day-slider by offsetting from DAY_START_HOUR
+                currentTime = data.time;
+                try {
+                    const ts = document.getElementById('timeSlider');
+                    const tv = document.getElementById('timeValue');
+                    if (ts && !isScrubbing) ts.value = String((DAY_START_HOUR * 3600) + Math.round(currentTime));
+                    if (tv) tv.textContent = formatTimeOfDay((DAY_START_HOUR * 3600) + currentTime);
+                } catch (e) {}
+                updateTimeDisplay();
+            } else {
+                // ignore server time update while locked to prevent flicker
+            }
         } else {
-            updateTimeDisplay(data.time);
+            if (!locked) updateTimeDisplay(data.time);
         }
+
+        // If locked, skip updating positions and derived UI that would conflict with local playback
+        if (locked) return;
+
         updateAircraftPositions(data.aircraft);
         updateConflictAlerts(data.conflicts || []);
         if (showDistanceMatrix) {
@@ -417,6 +432,8 @@ function startSimulation() {
     try { socket.emit('start-simulation', { speed: playbackSpeed, startTime: currentTime }); } catch (e) {}
     // Also start local playback immediately from our currentTime so play reflects the scrubber
     try { play(); } catch (e) {}
+    // Lock out incoming server updates briefly so client playback doesn't get immediately overwritten
+    try { serverSyncLockUntil = (typeof performance !== 'undefined' && performance.now) ? performance.now() + 1500 : Date.now() + 1500; } catch (e) {}
     document.getElementById('playBtn').disabled = true;
     document.getElementById('pauseBtn').disabled = false;
 }
@@ -425,6 +442,8 @@ function pauseSimulation() {
     socket.emit('pause-simulation');
     document.getElementById('playBtn').disabled = false;
     document.getElementById('pauseBtn').disabled = true;
+    // Clear any server-sync lock so incoming updates resume immediately
+    serverSyncLockUntil = 0;
 }
 
 function resetSimulation() {
@@ -438,6 +457,8 @@ function resetSimulation() {
     } catch (e) {}
     document.getElementById('playBtn').disabled = false;
     document.getElementById('pauseBtn').disabled = true;
+    // Clear lock to let server set UI back to baseline
+    serverSyncLockUntil = 0;
 }
 
 // Update connection status indicator
