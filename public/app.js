@@ -6,6 +6,18 @@ let militaryMarkers = {};
 let missionData = null;
 let aircraftMarkers = {};
 let aircraftPaths = {};
+// Cache last icon state for each marker to avoid recreating icons every update (reduces flicker)
+let aircraftMarkerStates = {};
+// Slider debounce to reduce update frequency during fast scrubbing
+let sliderDebounceTimer = null;
+const SLIDER_DEBOUNCE_MS = 100; // ms debounce for heavy updates
+// Preview layer/state used while scrubbing the time slider
+let previewLayer = null;
+let previewMarkers = {};
+let previewTime = null;
+// Throttle aircraft list updates to avoid heavy re-renders
+let lastAircraftListUpdateMs = 0;
+const AIRCRAFT_LIST_MIN_UPDATE_MS = 250; // ms
 // Airspace layer (airport control zones)
 let airspaceLayer = null;
 let airspaceVisible = false;
@@ -148,6 +160,8 @@ function initializeMap() {
 
     // layer to hold military airport markers (cleared/reused to avoid duplicates)
     militaryLayer = L.layerGroup().addTo(map);
+    // layer to hold lightweight preview markers while scrubbing
+    previewLayer = L.layerGroup().addTo(map);
     // map of current military markers keyed by ICAO code to avoid duplicates
     militaryMarkers = {};
 
@@ -416,20 +430,84 @@ function initializeControls() {
         timeSlider.step = '1'; // 1 second steps for stable scrubbing
 
         timeSlider.addEventListener('input', (e) => {
-            // Slider value is seconds since midnight (time-of-day). Map to mission-relative currentTime.
+            // Slider value is seconds since midnight (time-of-day). Map to mission-relative previewTime.
             const sliderSec = parseFloat(e.target.value) || dayStartSec;
-            currentTime = sliderSec - dayStartSec; // mission-relative seconds (0 = day start)
-            updateAircraftPositions();
-            updateTimeDisplay();
-            if (!isScrubbing) updateAircraftList();
+            previewTime = sliderSec - dayStartSec; // mission-relative seconds (0 = day start)
+            // Update the visible label immediately for responsiveness
             timeValue.textContent = formatTimeOfDay(sliderSec);
+            updateTimeDisplay();
+
+            // Update lightweight preview markers immediately (cheap)
+            try { updatePreviewPositions(previewTime); } catch (e) {}
         });
-        // Avoid playback/server updates while user is dragging
+        // Avoid playback/server updates while user is dragging. We keep preview separated
+        // from the authoritative simulation state. Releasing the slider will stop
+        // scrubbing but will NOT automatically commit the preview — user must click
+        // "Apply" to commit or "Cancel" to discard.
         timeSlider.addEventListener('pointerdown', () => { isScrubbing = true; });
-        window.addEventListener('pointerup', () => { if (isScrubbing) { isScrubbing = false; /* commit final position */ const ts = document.getElementById('timeSlider'); if (ts) { const s = parseFloat(ts.value) || dayStartSec; currentTime = s - dayStartSec; updateAircraftPositions(); updateTimeDisplay(); updateAircraftList(); } } });
-        // Touch fallback
+        // Hide main markers when scrubbing so preview markers don't fight with them
+        timeSlider.addEventListener('pointerdown', () => { try { hideMainMarkers(); } catch (e) {} });
+
+        window.addEventListener('pointerup', () => {
+            if (isScrubbing) {
+                // Stop scrubbing but keep the preview active until the user applies or cancels
+                isScrubbing = false;
+                clearTimeout(sliderDebounceTimer);
+            }
+        });
+        // Touch fallback: same behavior as pointer events
         timeSlider.addEventListener('touchstart', () => { isScrubbing = true; });
-        window.addEventListener('touchend', () => { if (isScrubbing) { isScrubbing = false; const ts = document.getElementById('timeSlider'); if (ts) { const s = parseFloat(ts.value) || dayStartSec; currentTime = s - dayStartSec; updateAircraftPositions(); updateTimeDisplay(); updateAircraftList(); } } });
+        timeSlider.addEventListener('touchstart', () => { try { hideMainMarkers(); } catch (e) {} });
+        window.addEventListener('touchend', () => {
+            if (isScrubbing) {
+                isScrubbing = false;
+                clearTimeout(sliderDebounceTimer);
+            }
+        });
+
+        // Apply / Cancel buttons control committing or discarding the preview
+        try {
+            const applyBtn = document.getElementById('applyTimeBtn');
+            const cancelBtn = document.getElementById('cancelScrubBtn');
+            const commitPreview = () => {
+                // Commit previewTime (or slider value) to authoritative currentTime
+                const ts = document.getElementById('timeSlider');
+                let finalSec = null;
+                if (ts) finalSec = parseFloat(ts.value) || dayStartSec;
+                if (previewTime !== null) {
+                    currentTime = previewTime;
+                } else if (finalSec !== null) {
+                    currentTime = finalSec - dayStartSec;
+                }
+                try { serverSyncLockUntil = (typeof performance !== 'undefined' && performance.now) ? performance.now() + 3000 : Date.now() + 3000; } catch (e) {}
+                try { clearPreviewMarkers(); } catch (e) {}
+                updateAircraftPositions();
+                updateTimeDisplay();
+                // Force aircraft list to refresh immediately after commit
+                try { updateAircraftList({ _force: true }); } catch (e) {}
+                previewTime = null;
+                try { showMainMarkers(); } catch (e) {}
+            };
+            const cancelPreview = () => {
+                // Discard preview and restore authoritative simulation state
+                previewTime = null;
+                try { clearPreviewMarkers(); } catch (e) {}
+                try { showMainMarkers(); } catch (e) {}
+                // Restore the slider and label to currentTime so UI reflects authoritative state
+                try {
+                    const ts = document.getElementById('timeSlider');
+                    const tv = document.getElementById('timeValue');
+                    const dayStartSec = DAY_START_HOUR * 3600;
+                    if (ts) ts.value = String(dayStartSec + Math.round(currentTime));
+                    if (tv) tv.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
+                    updateTimeDisplay();
+                } catch (e) {}
+            };
+            if (applyBtn) applyBtn.addEventListener('click', commitPreview);
+            if (cancelBtn) cancelBtn.addEventListener('click', cancelPreview);
+            // Also allow Escape key to cancel preview
+            window.addEventListener('keydown', (e) => { if (e.key === 'Escape') cancelPreview(); });
+        } catch (e) {}
     }
     
     // Initialize speed preset buttons
@@ -531,18 +609,19 @@ function initializeMission() {
         // Create aircraft marker
         const startPos = aircraft.route[0];
                     const initialIconHtml = `
-                                        <div style="position: relative; width: 140px; height: 44px;">
-                                            <div style="position: absolute; left: 50%; transform: translateX(-50%); top: -15px;">
-                                                <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
-                                                    <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
-                                                </svg>
-                                            </div>
-                                            <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; display:flex; align-items:center; gap:8px; font-size:10px; white-space:nowrap;">
-                                                <div style="font-weight:700; color:#111;">${aircraft.callsign}</div>
-                                                <div style="font-size:10px; color:#555;">FL${String(Math.round(startPos.alt/100)).padStart(3,'0')}</div>
-                                            </div>
-                                        </div>
-                                    `;
+                            <div class="ac-icon" style="position: relative; width: 140px; height: 44px;">
+                                <div class="ac-rot" style="position: absolute; left: 50%; transform: translateX(-50%); top: -15px;">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
+                                        <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
+                                    </svg>
+                                </div>
+                                <div class="ac-labels" style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; display:flex; align-items:center; gap:8px; font-size:10px; white-space:nowrap;">
+                                    <div class="ac-callsign" style="font-weight:700; color:#111;">${aircraft.callsign}</div>
+                                    <div class="ac-alt" style="font-size:10px; color:#555;">FL${String(Math.round(startPos.alt/100)).padStart(3,'0')}</div>
+                                    <div class="ac-vs" style="font-size:10px; color:#555; margin-left:4px;"></div>
+                                </div>
+                            </div>
+                        `;
 
                 const marker = L.marker([startPos.lat, startPos.lon], {
             icon: L.divIcon({ className: 'aircraft-marker', html: initialIconHtml, iconSize: [140, 44], iconAnchor: [70, 0] })
@@ -558,6 +637,17 @@ function initializeMission() {
         `);
         
         aircraftMarkers[aircraft.id] = marker;
+        // Store initial icon state to avoid redundant icon replacements
+        try {
+            const flightLevel = Math.round(startPos.alt / 100);
+            const altDisplay = `FL${String(flightLevel).padStart(3, '0')}`;
+            aircraftMarkerStates[aircraft.id] = {
+                heading: aircraft.heading || 0,
+                color: aircraft.color,
+                callsign: aircraft.callsign,
+                altDisplay: altDisplay
+            };
+        } catch (e) {}
     });
     
     // Fit map to show all routes
@@ -580,7 +670,7 @@ function initializeMission() {
     }
     
     // Update aircraft list
-    updateAircraftList();
+                updateAircraftList({ _force: true });
     
     // Reset time (mission-relative seconds)
     currentTime = 0;
@@ -606,6 +696,11 @@ function initializeMission() {
 
 // Update aircraft list in info panel
 function updateAircraftList(aircraftArray) {
+    const nowMs = Date.now();
+    // Allow forced updates by passing aircraftArray.force = true (or via second arg in callers)
+    const forced = (aircraftArray && aircraftArray._force) || false;
+    if (!forced && (nowMs - lastAircraftListUpdateMs) < AIRCRAFT_LIST_MIN_UPDATE_MS) return;
+    lastAircraftListUpdateMs = nowMs;
     const listEl = document.getElementById('aircraftList');
     
     // If using simulation-update data
@@ -827,7 +922,7 @@ function reset() {
     currentTime = 0;
     updateAircraftPositions();
     updateTimeDisplay();
-    updateAircraftList();
+                updateAircraftList({ _force: true });
     try {
         const ts = document.getElementById('timeSlider');
         const tv = document.getElementById('timeValue');
@@ -861,17 +956,18 @@ function updateAircraftPositions(aircraftData) {
                 const flightLevel = Math.round(aircraft.altitude / 100);
                 const altDisplay = `FL${String(flightLevel).padStart(3, '0')}`;
                 
-                                // Create custom SVG triangle icon with labels; anchor at the triangle tip (top center)
+                                // Create custom SVG triangle icon with identifiable classes for in-place updates
                                 const iconHtml = `
-                                    <div style="position: relative; width: 140px; height: 44px;">
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: -10px;">
+                                    <div class="ac-icon" style="position: relative; width: 140px; height: 44px;">
+                                        <div class="ac-rot" style="position: absolute; left: 50%; transform: translateX(-50%); top: -10px;">
                                             <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
                                                 <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
                                             </svg>
                                         </div>
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap;">
-                                            <div style="font-weight:700; color:#111;">${aircraft.callsign}</div>
-                                            <div style="font-size:11px; color:#555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
+                                        <div class="ac-labels" style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap;">
+                                            <div class="ac-callsign" style="font-weight:700; color:#111;">${aircraft.callsign}</div>
+                                            <div class="ac-alt" style="font-size:11px; color:#555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
+                                            <div class="ac-vs" style="font-size:11px; color:#555; margin-left:4px;"></div>
                                         </div>
                                     </div>
                                 `;
@@ -919,6 +1015,17 @@ function updateAircraftPositions(aircraftData) {
                 marker.on('click', () => marker.openPopup());
 
                 aircraftMarkers[key] = marker;
+                // Cache icon state to avoid unnecessary setIcon calls
+                try {
+                    const flightLevel = Math.round(aircraft.altitude / 100);
+                    const altDisplay = `FL${String(flightLevel).padStart(3, '0')}`;
+                    aircraftMarkerStates[key] = {
+                        heading: aircraft.heading || 0,
+                        color: aircraft.color,
+                        callsign: aircraft.callsign,
+                        altDisplay: altDisplay
+                    };
+                } catch (e) {}
             } else {
                 // Update existing marker
                 aircraftMarkers[key].setLatLng([lat, lon]);
@@ -935,24 +1042,42 @@ function updateAircraftPositions(aircraftData) {
                 const flightLevel = Math.round(aircraft.altitude / 100);
                 const altDisplay = `FL${String(flightLevel).padStart(3, '0')}`;
                 
-                                // Update icon with new altitude and heading — unify with initial icon sizing/anchor
-                                const updatedIconHtml = `
-                                    <div style="position: relative; width: 140px; height: 44px;">
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: -10px;">
-                                            <svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${aircraft.heading || 0}deg);">
-                                                <polygon points="10,0 0,20 20,20" fill="${aircraft.color}" />
-                                            </svg>
-                                        </div>
-                                        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 22px; display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap;">
-                                            <div style="font-weight:700; color:#111;">${aircraft.callsign}</div>
-                                            <div style="font-size:11px; color:#555;">${altDisplay} <span class="indicator">${vspeedIndicator}</span></div>
-                                        </div>
-                                    </div>
-                                `;
-
-                                const icon = L.divIcon({ className: 'aircraft-marker-icon', html: updatedIconHtml, iconSize: [140, 44], iconAnchor: [70, 0] });
-                
-                aircraftMarkers[key].setIcon(icon);
+                                // Update icon by mutating DOM in-place when possible (smooth, no DOM replacement)
+                                try {
+                                    const flightLevel = Math.round(aircraft.altitude / 100);
+                                    const altDisplay = `FL${String(flightLevel).padStart(3, '0')}`;
+                                    const newState = {
+                                        heading: aircraft.heading || 0,
+                                        color: aircraft.color,
+                                        callsign: aircraft.callsign,
+                                        altDisplay: altDisplay
+                                    };
+                                    const oldState = aircraftMarkerStates[key] || {};
+                                    const el = aircraftMarkers[key].getElement && aircraftMarkers[key].getElement();
+                                    if (el) {
+                                        // Rotate SVG
+                                        try { const svg = el.querySelector('svg'); if (svg) svg.style.transform = `rotate(${newState.heading}deg)`; } catch (e) {}
+                                        // Update text fields
+                                        try { const cs = el.querySelector('.ac-callsign'); if (cs) cs.textContent = newState.callsign; } catch (e) {}
+                                        try { const ae = el.querySelector('.ac-alt'); if (ae) ae.textContent = newState.altDisplay; } catch (e) {}
+                                        try { const ve = el.querySelector('.ac-vs'); if (ve) ve.textContent = vspeedIndicator; } catch (e) {}
+                                        aircraftMarkerStates[key] = newState;
+                                    } else {
+                                        // Fallback: only recreate the icon if visual state changed
+                                        const needIconUpdate = (
+                                            oldState.heading !== newState.heading ||
+                                            oldState.color !== newState.color ||
+                                            oldState.callsign !== newState.callsign ||
+                                            oldState.altDisplay !== newState.altDisplay
+                                        );
+                                        if (needIconUpdate) {
+                                            // Avoid recreating the icon element (setIcon) to prevent flicker.
+                                            // Instead, cache desired state and attempt to update the marker DOM asynchronously.
+                                            aircraftMarkerStates[key] = newState;
+                                            tryUpdateMarkerDOM(key, newState, vspeedIndicator);
+                                        }
+                                    }
+                                } catch (e) {}
 
                 // Update popup content
                 const popupContent = `
@@ -1010,6 +1135,13 @@ function updateAircraftPositions(aircraftData) {
                 // Skip updating this marker — server position is fresher
             } else {
                 marker.setLatLng([pos.lat, pos.lon]);
+                // Try updating marker DOM in-place (non-destructive)
+                tryUpdateMarkerDOM(aircraft.id, {
+                    heading: aircraft.heading || 0,
+                    color: aircraft.color,
+                    callsign: aircraft.callsign,
+                    altDisplay: `FL${String(Math.round(pos.alt/100)).padStart(3,'0')}`
+                }, '');
             }
             marker.setPopupContent(`
                 <div class="popup-aircraft-info">
@@ -1057,6 +1189,91 @@ function updateTimeDisplay(time) {
         const dayStartSec = DAY_START_HOUR * 3600;
         displayEl.textContent = `Time: ${formatTimeOfDay(dayStartSec + Math.round(currentTime))}`;
     }
+}
+
+// Update lightweight preview markers for a given mission-relative time
+function updatePreviewPositions(time) {
+    if (!missionData || !missionData.aircraft || !previewLayer) return;
+    try {
+        missionData.aircraft.forEach(ac => {
+            try {
+                const pos = getCurrentPosition(ac, time);
+                const key = ac.id;
+                let pm = previewMarkers[key];
+                if (!pm) {
+                    pm = L.circleMarker([pos.lat, pos.lon], {
+                        radius: 4,
+                        color: ac.color || '#333',
+                        weight: 1,
+                        fillColor: ac.color || '#333',
+                        fillOpacity: 0.9,
+                        interactive: false
+                    }).addTo(previewLayer);
+                    previewMarkers[key] = pm;
+                } else {
+                    pm.setLatLng([pos.lat, pos.lon]);
+                }
+            } catch (e) {}
+        });
+    } catch (e) {}
+}
+
+function clearPreviewMarkers() {
+    try {
+        if (previewLayer) previewLayer.clearLayers();
+    } catch (e) {}
+    previewMarkers = {};
+}
+
+function hideMainMarkers() {
+    try {
+        Object.keys(aircraftMarkers).forEach(k => {
+            try {
+                const m = aircraftMarkers[k];
+                const el = m && m.getElement && m.getElement();
+                if (el) el.style.display = 'none';
+            } catch (e) {}
+        });
+    } catch (e) {}
+}
+
+function showMainMarkers() {
+    try {
+        Object.keys(aircraftMarkers).forEach(k => {
+            try {
+                const m = aircraftMarkers[k];
+                const el = m && m.getElement && m.getElement();
+                if (el) el.style.display = '';
+            } catch (e) {}
+        });
+    } catch (e) {}
+}
+
+// Try to update a marker's inner DOM when it becomes available.
+function tryUpdateMarkerDOM(key, state, vspeedIndicator) {
+    try {
+        const marker = aircraftMarkers[key];
+        if (!marker) return;
+        const el = marker.getElement && marker.getElement();
+        if (el) {
+            try { const svg = el.querySelector('svg'); if (svg) svg.style.transform = `rotate(${state.heading}deg)`; } catch (e) {}
+            try { const cs = el.querySelector('.ac-callsign'); if (cs) cs.textContent = state.callsign; } catch (e) {}
+            try { const ae = el.querySelector('.ac-alt'); if (ae) ae.textContent = state.altDisplay; } catch (e) {}
+            try { const ve = el.querySelector('.ac-vs'); if (ve) ve.textContent = vspeedIndicator || ''; } catch (e) {}
+            // update cache
+            aircraftMarkerStates[key] = state;
+        } else {
+            // Retry shortly; don't loop indefinitely
+            setTimeout(() => {
+                try {
+                    const el2 = marker.getElement && marker.getElement();
+                    if (el2) {
+                        tryUpdateMarkerDOM(key, state, vspeedIndicator);
+                    }
+                } catch (e) {}
+            }, 250);
+        }
+    } catch (e) {}
 }
 
 // ============================================
