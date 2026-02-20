@@ -549,6 +549,7 @@ function startSimulation() {
 
 function pauseSimulation() {
     socket.emit('pause-simulation');
+    try { pause(); } catch (e) {}
     document.getElementById('playBtn').disabled = false;
     document.getElementById('pauseBtn').disabled = true;
     // Clear any server-sync lock so incoming updates resume immediately
