@@ -43,14 +43,14 @@ let departurePreviewMarker = null;
 let arrivalPreviewMarker = null;
 
 // Conflict and Distance state
-let showDistanceMatrix = false;
+let showDistanceMatrix = true;
 let activeConflicts = [];
 
 // Constants
 const DEFAULT_CRUISE_ALTITUDE = 3000;
 const DEFAULT_ARRIVAL_ALTITUDE = 1000;
-const DAY_START_HOUR = 7; // 07:00 UTC
-const DAY_END_HOUR = 22;  // 22:00 UTC
+const DAY_START_HOUR = 6; // 06:00 UTC
+const DAY_END_HOUR = 18;  // 18:00 UTC
 // If the server has updated an aircraft within this window, prefer server positions
 const SERVER_IGNORE_WINDOW_MS = 3000;
 
@@ -114,6 +114,17 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWebSocket();
     initializeControls();
     initializeMissionEditor();
+    // Ensure separation/distance panels are visible by default
+    try {
+        const matrixEl = document.getElementById('distance-matrix');
+        if (matrixEl) matrixEl.style.display = 'block';
+        const toggleBtn = document.getElementById('toggle-distances-btn');
+        if (toggleBtn) toggleBtn.style.display = 'none';
+        const sepPanel = document.getElementById('separation-panel');
+        if (sepPanel) sepPanel.style.display = '';
+        const conflictPanel = document.getElementById('conflict-panel');
+        if (conflictPanel) conflictPanel.style.display = '';
+    } catch (e) {}
     // Style the native color input so only the chosen swatch is visible
     try {
         const colorInput = document.getElementById('aircraftColor');
