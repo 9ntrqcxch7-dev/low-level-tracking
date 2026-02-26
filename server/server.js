@@ -16,6 +16,11 @@ const io = socketIO(server, {
 });
 
 const PORT = process.env.PORT || 3000;
+const SIMULATION_BASE_TIME = new Date('2024-01-01T07:00:00Z');
+const DEFAULT_AIRCRAFT_SPEED = 250;
+const DEFAULT_AIRCRAFT_ALTITUDE = 3000;
+const MAX_AIRCRAFT = Number(process.env.MAX_AIRCRAFT) || 200;
+const MAX_ROUTE_POINTS = Number(process.env.MAX_ROUTE_POINTS) || 200;
 
 // Middleware
 app.use(cors());
@@ -31,7 +36,7 @@ const CONFLICT_THRESHOLDS = {
 // Simulation state
 let simulationInterval = null;
 let simulationRunning = false;
-let simulationTime = new Date('2024-01-01T07:00:00Z'); // Start time
+let simulationTime = new Date(SIMULATION_BASE_TIME.getTime()); // Start time
 let simulationSpeed = 1; // Speed multiplier
 
 // Load mission data
@@ -82,6 +87,114 @@ function haversineDistance(pos1, pos2) {
   return R * c;
 }
 
+function toFiniteNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function sanitizeText(value, maxLength = 32) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .replace(/[<>&"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function sanitizeAircraftId(value, fallbackId) {
+  const raw = sanitizeText(String(value || ''), 32);
+  const normalized = raw.replace(/[^A-Za-z0-9_-]/g, '');
+  return normalized || fallbackId;
+}
+
+function sanitizeIcao(value) {
+  const code = sanitizeText(String(value || ''), 4).toUpperCase();
+  return /^[A-Z]{4}$/.test(code) ? code : '';
+}
+
+function normalizeColor(value) {
+  const color = typeof value === 'string' ? value.trim() : '';
+  return /^#[A-Fa-f0-9]{6}$/.test(color) ? color.toUpperCase() : '#3388FF';
+}
+
+function normalizeRoutePoint(point) {
+  if (!point || typeof point !== 'object') return null;
+
+  const lat = toFiniteNumber(point.lat);
+  const lon = toFiniteNumber(point.lon ?? point.lng);
+  if (lat === null || lon === null) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+
+  const altCandidate = toFiniteNumber(point.alt);
+  const altitude = Math.round(
+    altCandidate === null ? DEFAULT_AIRCRAFT_ALTITUDE : clamp(altCandidate, 0, 60000)
+  );
+
+  return {
+    lat,
+    lon,
+    alt: altitude
+  };
+}
+
+function resolveUniqueAircraftId(candidateId, usedIds) {
+  if (!usedIds.has(candidateId)) {
+    usedIds.add(candidateId);
+    return candidateId;
+  }
+
+  let suffix = 1;
+  let nextId = `${candidateId}-${suffix}`;
+  while (usedIds.has(nextId)) {
+    suffix += 1;
+    nextId = `${candidateId}-${suffix}`;
+  }
+  usedIds.add(nextId);
+  return nextId;
+}
+
+function normalizeAircraft(rawAircraft, fallbackId, usedIds) {
+  if (!rawAircraft || typeof rawAircraft !== 'object') return null;
+
+  const route = Array.isArray(rawAircraft.route) ? rawAircraft.route : [];
+  if (route.length < 2 || route.length > MAX_ROUTE_POINTS) return null;
+
+  const normalizedRoute = route
+    .map(normalizeRoutePoint)
+    .filter(Boolean);
+  if (normalizedRoute.length < 2) return null;
+
+  const speedCandidate = toFiniteNumber(rawAircraft.speed);
+  const speed = speedCandidate === null
+    ? DEFAULT_AIRCRAFT_SPEED
+    : clamp(speedCandidate, 50, 1200);
+
+  const startTimeRaw = rawAircraft.startTime ? new Date(rawAircraft.startTime) : null;
+  const startTime = startTimeRaw && !Number.isNaN(startTimeRaw.getTime())
+    ? startTimeRaw.toISOString()
+    : simulationTime.toISOString();
+
+  const idBase = sanitizeAircraftId(rawAircraft.id, fallbackId);
+  const id = resolveUniqueAircraftId(idBase, usedIds);
+
+  return {
+    id,
+    callsign: sanitizeText(rawAircraft.callsign, 24) || id,
+    type: sanitizeText(rawAircraft.type, 24) || 'Custom',
+    color: normalizeColor(rawAircraft.color),
+    speed: Math.round(speed),
+    startTime,
+    departure: sanitizeIcao(rawAircraft.departure),
+    arrival: sanitizeIcao(rawAircraft.arrival),
+    route: normalizedRoute
+  };
+}
+
 // Calculate current position and altitude for an aircraft
 function calculateAircraftState(aircraft, currentTime) {
   if (!aircraft.route || aircraft.route.length < 2) {
@@ -104,7 +217,7 @@ function calculateAircraftState(aircraft, currentTime) {
   // Calculate position along route
   const speed = aircraft.speed || 250; // knots
   const speedNmPerSec = speed / 3600; // nautical miles per second
-  let distanceTraveled = elapsed * speedNmPerSec;
+  const distanceTraveled = elapsed * speedNmPerSec;
 
   // Calculate cumulative distances between waypoints
   const segments = [];
@@ -148,7 +261,9 @@ function calculateAircraftState(aircraft, currentTime) {
   for (const segment of segments) {
     if (distanceTraveled <= cumulativeDist + segment.distance) {
       currentSegment = segment;
-      segmentProgress = (distanceTraveled - cumulativeDist) / segment.distance;
+      segmentProgress = segment.distance > 0
+        ? (distanceTraveled - cumulativeDist) / segment.distance
+        : 1;
       break;
     }
     cumulativeDist += segment.distance;
@@ -171,8 +286,10 @@ function calculateAircraftState(aircraft, currentTime) {
 
   // Calculate vertical speed (ft/min)
   const altDiff = currentSegment.endAlt - currentSegment.startAlt;
-  const timeForSegment = (currentSegment.distance / speedNmPerSec); // seconds
-  const verticalSpeed = (altDiff / timeForSegment) * 60; // ft/min
+  const timeForSegment = currentSegment.distance > 0
+    ? (currentSegment.distance / speedNmPerSec)
+    : 0;
+  const verticalSpeed = timeForSegment > 0 ? (altDiff / timeForSegment) * 60 : 0; // ft/min
 
   // Calculate heading
   const deltaLon = currentSegment.end.lon - currentSegment.start.lon;
@@ -345,6 +462,7 @@ function updateSimulation() {
   // Broadcast update to all clients
   io.emit('simulation-update', {
     time: simulationTime.toISOString(),
+    elapsedSeconds: Math.max(0, Math.round((simulationTime - SIMULATION_BASE_TIME) / 1000)),
     aircraft: aircraftStates,
     conflicts: conflicts,
     distances: distances,
@@ -379,24 +497,20 @@ io.on('connection', (socket) => {
   socket.on('addAircraft', (aircraft) => {
     try {
       console.log('Adding aircraft:', aircraft);
-      
-      // Process route to add required fields
-      const processedAircraft = {
-        id: aircraft.id,
-        callsign: aircraft.callsign,
-        type: aircraft.type || 'Custom',
-        color: aircraft.color,
-        speed: aircraft.speed || 250,
-        startTime: aircraft.startTime || simulationTime.toISOString(),
-        departure: aircraft.departure || '',
-        arrival: aircraft.arrival || '',
-        route: aircraft.route.map((point, index) => ({
-          lat: point.lat,
-          lon: point.lng || point.lon,
-          alt: point.alt || 3000
-        }))
-      };
-      
+
+      if (simulation.aircraft.length >= MAX_AIRCRAFT) {
+        socket.emit('error', { message: `Maximum number of aircraft reached (${MAX_AIRCRAFT})` });
+        return;
+      }
+
+      const usedIds = new Set(simulation.aircraft.map(ac => ac.id));
+      const fallbackId = `AC${simulation.aircraftCounter + 1}`;
+      const processedAircraft = normalizeAircraft(aircraft, fallbackId, usedIds);
+      if (!processedAircraft) {
+        socket.emit('error', { message: 'Invalid aircraft payload. Route must contain at least 2 valid waypoints.' });
+        return;
+      }
+
       simulation.aircraft.push(processedAircraft);
       simulation.aircraftCounter++;
       
@@ -444,18 +558,23 @@ io.on('connection', (socket) => {
   socket.on('getMission', () => {
     try {
       const missionToSave = {
-        name: 'Custom Mission',
-        description: 'User-created mission',
-        startTime: new Date().toISOString(),
+        mission: missionData?.mission || 'Custom Mission',
+        name: missionData?.mission || 'Custom Mission',
+        description: missionData?.description || 'User-created mission',
+        startTime: simulationTime.toISOString(),
         aircraft: simulation.aircraft.map(ac => ({
           id: ac.id,
           callsign: ac.callsign,
-          startTime: new Date().toISOString(),
-          speed: 250,
+          type: ac.type || 'Custom',
+          startTime: ac.startTime || simulationTime.toISOString(),
+          speed: ac.speed || DEFAULT_AIRCRAFT_SPEED,
           color: ac.color,
+          departure: ac.departure || '',
+          arrival: ac.arrival || '',
           route: ac.route.map(point => ({
             lat: point.lat,
-            lng: point.lon
+            lon: point.lon,
+            alt: point.alt ?? DEFAULT_AIRCRAFT_ALTITUDE
           }))
         }))
       };
@@ -472,30 +591,38 @@ io.on('connection', (socket) => {
   socket.on('loadMission', (loadedMission) => {
     try {
       console.log('Loading mission:', loadedMission);
-      
-      // Process loaded aircraft
-      const processedAircraft = loadedMission.aircraft.map(ac => ({
-        id: ac.id,
-        callsign: ac.callsign,
-        type: ac.type || 'Custom',
-        color: ac.color,
-        speed: ac.speed || 250,
-        startTime: ac.startTime || simulationTime.toISOString(),
-        departure: ac.departure || '',
-        arrival: ac.arrival || '',
-        route: ac.route.map((point, index) => ({
-          lat: point.lat,
-          lon: point.lng || point.lon,
-          alt: point.alt || 3000
-        }))
-      }));
-      
+
+      if (!loadedMission || !Array.isArray(loadedMission.aircraft)) {
+        socket.emit('error', { message: 'Invalid mission payload' });
+        return;
+      }
+
+      if (loadedMission.aircraft.length > MAX_AIRCRAFT) {
+        socket.emit('error', { message: `Mission has too many aircraft (max ${MAX_AIRCRAFT})` });
+        return;
+      }
+
+      const usedIds = new Set();
+      const processedAircraft = loadedMission.aircraft
+        .map((ac, index) => normalizeAircraft(ac, `AC${index + 1}`, usedIds))
+        .filter(Boolean);
+
+      if (processedAircraft.length === 0) {
+        socket.emit('error', { message: 'Mission does not contain any valid aircraft' });
+        return;
+      }
+
       simulation.aircraft = processedAircraft;
       simulation.aircraftCounter = processedAircraft.length;
+      missionData = {
+        mission: sanitizeText(loadedMission.name || loadedMission.mission || 'Loaded Mission', 64),
+        description: sanitizeText(loadedMission.description || '', 256),
+        aircraft: processedAircraft
+      };
       
       // Broadcast updated mission to all clients
       const responseData = {
-        mission: loadedMission.name || 'Loaded Mission',
+        mission: missionData.mission || 'Loaded Mission',
         aircraft: simulation.aircraft
       };
       io.emit('mission-data', responseData);
@@ -533,7 +660,12 @@ io.on('connection', (socket) => {
   socket.on('start-simulation', (data) => {
     if (!simulationRunning) {
       simulationRunning = true;
-      simulationSpeed = data.speed || 1;
+      const requestedSpeed = toFiniteNumber(data && data.speed);
+      simulationSpeed = requestedSpeed === null ? 1 : clamp(requestedSpeed, 0.25, 300);
+      const requestedOffset = toFiniteNumber(data && data.startTime);
+      if (requestedOffset !== null && requestedOffset >= 0) {
+        simulationTime = new Date(SIMULATION_BASE_TIME.getTime() + requestedOffset * 1000);
+      }
       // Log the simulation time at the moment the client requested start
       console.log('Simulation requested start at server time:', simulationTime.toISOString(), 'speed:', simulationSpeed);
       simulationInterval = setInterval(updateSimulation, 1000);
@@ -556,12 +688,13 @@ io.on('connection', (socket) => {
       clearInterval(simulationInterval);
       simulationInterval = null;
     }
-    simulationTime = new Date('2024-01-01T07:00:00Z');
+    simulationTime = new Date(SIMULATION_BASE_TIME.getTime());
     console.log('Simulation reset');
   });
 
   socket.on('set-simulation-speed', (data) => {
-    simulationSpeed = data.speed || 1;
+    const requestedSpeed = toFiniteNumber(data && data.speed);
+    simulationSpeed = requestedSpeed === null ? 1 : clamp(requestedSpeed, 0.25, 300);
     console.log('Simulation speed set to:', simulationSpeed);
   });
 

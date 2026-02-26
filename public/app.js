@@ -8,16 +8,12 @@ let aircraftMarkers = {};
 let aircraftPaths = {};
 // Cache last icon state for each marker to avoid recreating icons every update (reduces flicker)
 let aircraftMarkerStates = {};
-// Slider debounce to reduce update frequency during fast scrubbing
-let sliderDebounceTimer = null;
-const SLIDER_DEBOUNCE_MS = 100; // ms debounce for heavy updates
-// Preview layer/state used while scrubbing the time slider
-let previewLayer = null;
-let previewMarkers = {};
-let previewTime = null;
 // Throttle aircraft list updates to avoid heavy re-renders
 let lastAircraftListUpdateMs = 0;
 const AIRCRAFT_LIST_MIN_UPDATE_MS = 250; // ms
+// Keep stable DOM nodes for the live aircraft list to prevent flicker.
+let aircraftListRenderMode = null;
+let aircraftListCards = {};
 // Airspace layer (airport control zones)
 let airspaceLayer = null;
 let airspaceVisible = false;
@@ -25,8 +21,7 @@ let isPlaying = false;
 let currentTime = 0;
 let playbackSpeed = 1;
 let animationInterval = null;
-let isScrubbing = false;
-// Temporary lock to ignore server time updates when client has just started playback from scrubber
+// Temporary lock to ignore server time updates right after local playback start
 let serverSyncLockUntil = 0; // performance.now() timestamp in ms
 // Track last time (ms) we received server position for each aircraft
 const lastServerUpdateMs = {};
@@ -49,8 +44,20 @@ let activeConflicts = [];
 // Constants
 const DEFAULT_CRUISE_ALTITUDE = 3000;
 const DEFAULT_ARRIVAL_ALTITUDE = 1000;
-const DAY_START_HOUR = 6; // 06:00 UTC
+const DAY_START_HOUR = 7; // 07:00 UTC
 const DAY_END_HOUR = 18;  // 18:00 UTC
+const UI_LOCALE = 'en-US';
+const uiNumberFormatter = new Intl.NumberFormat(UI_LOCALE);
+const uiDateTimeFormatter = new Intl.DateTimeFormat(UI_LOCALE, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'UTC'
+});
 // If the server has updated an aircraft within this window, prefer server positions
 const SERVER_IGNORE_WINDOW_MS = 3000;
 
@@ -61,6 +68,18 @@ function formatTimeOfDay(secondsSinceMidnight) {
     const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
     const ss = Math.floor(s % 60).toString().padStart(2, '0');
     return `${hh}:${mm}:${ss} UTC`;
+}
+
+function formatNumber(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? uiNumberFormatter.format(num) : '0';
+}
+
+function formatDateTimeUTC(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return `${uiDateTimeFormatter.format(date)} UTC`;
 }
 
 // Haversine distance (meters) between two lat/lon points
@@ -171,8 +190,6 @@ function initializeMap() {
 
     // layer to hold military airport markers (cleared/reused to avoid duplicates)
     militaryLayer = L.layerGroup().addTo(map);
-    // layer to hold lightweight preview markers while scrubbing
-    previewLayer = L.layerGroup().addTo(map);
     // map of current military markers keyed by ICAO code to avoid duplicates
     militaryMarkers = {};
 
@@ -320,17 +337,17 @@ function initializeWebSocket() {
     });
     
     socket.on('simulation-update', (data) => {
-        // If the user is actively scrubbing, ignore server updates to avoid fighting the UI
-        if (isScrubbing) return;
-
-        // If we recently started playback from the scrubber, temporarily ignore server time/positions
+        // If we recently started playback locally, temporarily ignore server time/positions
         const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const locked = serverSyncLockUntil && now < serverSyncLockUntil;
 
-        // If server provides numeric simulation time (seconds), reconcile with our local time
-        if (typeof data.time === 'number') {
+        // If server provides mission elapsed seconds, reconcile with our local time
+        const serverElapsedSeconds = typeof data.elapsedSeconds === 'number'
+            ? data.elapsedSeconds
+            : (typeof data.time === 'number' ? data.time : null);
+        if (serverElapsedSeconds !== null) {
             if (!locked) {
-                const serverTime = data.time;
+                const serverTime = serverElapsedSeconds;
                 try {
                     const nowMs = Date.now();
                     // If client is not currently playing, follow server exactly and mark handled
@@ -353,12 +370,6 @@ function initializeWebSocket() {
                             lastServerTimeHandledMs = nowMs;
                         }
                     }
-
-                    const ts = document.getElementById('timeSlider');
-                    const tv = document.getElementById('timeValue');
-                    const dayStartSec = DAY_START_HOUR * 3600;
-                    if (ts && !isScrubbing) ts.value = String(dayStartSec + Math.round(currentTime));
-                    if (tv) tv.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
                 } catch (e) {}
                 updateTimeDisplay();
             }
@@ -382,7 +393,7 @@ function initializeWebSocket() {
         if (data.separations) {
             updateSeparationMonitor(data.separations);
         }
-        if (!isScrubbing) updateAircraftList(data.aircraft);
+        updateAircraftList(data.aircraft);
     });
     
     socket.on('message-data', (data) => {
@@ -422,104 +433,13 @@ function initializeControls() {
     
     const speedControl = document.getElementById('speedControl');
     speedControl.addEventListener('input', (e) => {
-        playbackSpeed = parseInt(e.target.value);
+        const requestedSpeed = Number.parseFloat(e.target.value);
+        playbackSpeed = Number.isFinite(requestedSpeed) ? requestedSpeed : 1;
         document.getElementById('speedValue').textContent = `${playbackSpeed}x`;
         
         // Update simulation speed if simulation is running
         socket.emit('set-simulation-speed', { speed: playbackSpeed });
     });
-
-    // Time scrubber (seek)
-    const timeSlider = document.getElementById('timeSlider');
-    const timeValue = document.getElementById('timeValue');
-    if (timeSlider && timeValue) {
-        const dayStartSec = DAY_START_HOUR * 3600;
-        const dayEndSec = DAY_END_HOUR * 3600;
-        // Configure slider as seconds-since-midnight representing a wall-clock time
-        timeSlider.min = String(dayStartSec);
-        timeSlider.max = String(dayEndSec);
-        timeSlider.step = '1'; // 1 second steps for stable scrubbing
-
-        timeSlider.addEventListener('input', (e) => {
-            // Slider value is seconds since midnight (time-of-day). Map to mission-relative previewTime.
-            const sliderSec = parseFloat(e.target.value) || dayStartSec;
-            previewTime = sliderSec - dayStartSec; // mission-relative seconds (0 = day start)
-            // Update the visible label immediately for responsiveness
-            timeValue.textContent = formatTimeOfDay(sliderSec);
-            updateTimeDisplay();
-
-            // Update lightweight preview markers immediately (cheap)
-            try { updatePreviewPositions(previewTime); } catch (e) {}
-        });
-        // Avoid playback/server updates while user is dragging. We keep preview separated
-        // from the authoritative simulation state. Releasing the slider will stop
-        // scrubbing but will NOT automatically commit the preview — user must click
-        // "Apply" to commit or "Cancel" to discard.
-        timeSlider.addEventListener('pointerdown', () => { isScrubbing = true; });
-        // Hide main markers when scrubbing so preview markers don't fight with them
-        timeSlider.addEventListener('pointerdown', () => { try { hideMainMarkers(); } catch (e) {} });
-
-        window.addEventListener('pointerup', () => {
-            if (isScrubbing) {
-                // Stop scrubbing but keep the preview active until the user applies or cancels
-                isScrubbing = false;
-                clearTimeout(sliderDebounceTimer);
-            }
-        });
-        // Touch fallback: same behavior as pointer events
-        timeSlider.addEventListener('touchstart', () => { isScrubbing = true; });
-        timeSlider.addEventListener('touchstart', () => { try { hideMainMarkers(); } catch (e) {} });
-        window.addEventListener('touchend', () => {
-            if (isScrubbing) {
-                isScrubbing = false;
-                clearTimeout(sliderDebounceTimer);
-            }
-        });
-
-        // Apply / Cancel buttons control committing or discarding the preview
-        try {
-            const applyBtn = document.getElementById('applyTimeBtn');
-            const cancelBtn = document.getElementById('cancelScrubBtn');
-            const commitPreview = () => {
-                // Commit previewTime (or slider value) to authoritative currentTime
-                const ts = document.getElementById('timeSlider');
-                let finalSec = null;
-                if (ts) finalSec = parseFloat(ts.value) || dayStartSec;
-                if (previewTime !== null) {
-                    currentTime = previewTime;
-                } else if (finalSec !== null) {
-                    currentTime = finalSec - dayStartSec;
-                }
-                try { serverSyncLockUntil = (typeof performance !== 'undefined' && performance.now) ? performance.now() + 3000 : Date.now() + 3000; } catch (e) {}
-                try { clearPreviewMarkers(); } catch (e) {}
-                updateAircraftPositions();
-                updateTimeDisplay();
-                // Force aircraft list to refresh immediately after commit
-                try { updateAircraftList({ _force: true }); } catch (e) {}
-                previewTime = null;
-                try { showMainMarkers(); } catch (e) {}
-            };
-            const cancelPreview = () => {
-                // Discard preview and restore authoritative simulation state
-                previewTime = null;
-                try { clearPreviewMarkers(); } catch (e) {}
-                try { showMainMarkers(); } catch (e) {}
-                // Restore the slider and label to currentTime so UI reflects authoritative state
-                try {
-                    const ts = document.getElementById('timeSlider');
-                    const tv = document.getElementById('timeValue');
-                    const dayStartSec = DAY_START_HOUR * 3600;
-                    if (ts) ts.value = String(dayStartSec + Math.round(currentTime));
-                    if (tv) tv.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
-                    updateTimeDisplay();
-                } catch (e) {}
-            };
-            if (applyBtn) applyBtn.addEventListener('click', commitPreview);
-            if (cancelBtn) cancelBtn.addEventListener('click', cancelPreview);
-            // Also allow Escape key to cancel preview
-            window.addEventListener('keydown', (e) => { if (e.key === 'Escape') cancelPreview(); });
-        } catch (e) {}
-    }
     
     // Initialize speed preset buttons
     const speedButtons = document.querySelectorAll('.speed-btn');
@@ -530,7 +450,7 @@ function initializeControls() {
             // Update speed
             playbackSpeed = speed;
             document.getElementById('speedValue').textContent = `${speed}x`;
-            document.getElementById('speedControl').value = Math.round(speed);
+            document.getElementById('speedControl').value = String(speed);
             
             // Update active button
             speedButtons.forEach(b => b.classList.remove('active'));
@@ -548,9 +468,9 @@ function initializeControls() {
 
 // Simulation control functions
 function startSimulation() {
-    // Send desired start time so server can start from the scrubber position
+    // Send desired start time so server can start from current local timeline
     try { socket.emit('start-simulation', { speed: playbackSpeed, startTime: currentTime }); } catch (e) {}
-    // Also start local playback immediately from our currentTime so play reflects the scrubber
+    // Also start local playback immediately from currentTime
     try { play(); } catch (e) {}
     // Lock out incoming server updates briefly so client playback doesn't get immediately overwritten
     try { serverSyncLockUntil = (typeof performance !== 'undefined' && performance.now) ? performance.now() + 3000 : Date.now() + 3000; } catch (e) {}
@@ -639,14 +559,7 @@ function initializeMission() {
             icon: L.divIcon({ className: 'aircraft-marker', html: initialIconHtml, iconSize: [140, 44], iconAnchor: [70, 0] })
         }).addTo(map);
         
-        marker.bindPopup(`
-            <div class="popup-aircraft-info">
-                <h4>${aircraft.callsign}</h4>
-                <p><strong>Type:</strong> ${aircraft.type}</p>
-                <p><strong>Altitude:</strong> ${startPos.alt} ft</p>
-                <p><strong>Position:</strong> ${startPos.lat.toFixed(4)}, ${startPos.lon.toFixed(4)}</p>
-            </div>
-        `);
+        marker.bindPopup(buildLegacyPopupContent(aircraft, startPos));
         
         aircraftMarkers[aircraft.id] = marker;
         // Store initial icon state to avoid redundant icon replacements
@@ -687,132 +600,236 @@ function initializeMission() {
     // Reset time (mission-relative seconds)
     currentTime = 0;
     updateTimeDisplay();
+}
 
-    // Configure time slider to cover the day-of-day range (DAY_START_HOUR..DAY_END_HOUR)
-    try {
-        const timeSlider = document.getElementById('timeSlider');
-        const timeValue = document.getElementById('timeValue');
-        const dayStartSec = DAY_START_HOUR * 3600;
-        if (timeSlider) {
-            timeSlider.min = String(dayStartSec);
-            timeSlider.max = String(DAY_END_HOUR * 3600);
-            timeSlider.step = '1';
-            // Position slider to day start (mission-relative 0)
-            timeSlider.value = String(dayStartSec + Number(currentTime.toFixed ? Number(currentTime.toFixed(1)) : currentTime));
-        }
-        if (timeValue) timeValue.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
-    } catch (e) {
-        // ignore if DOM not ready
+function estimateAircraftEndTime(aircraft) {
+    if (!aircraft || !aircraft.startTime || !Array.isArray(aircraft.route) || aircraft.route.length < 2) {
+        return '-';
     }
+
+    const startDate = new Date(aircraft.startTime);
+    if (Number.isNaN(startDate.getTime())) return '-';
+
+    const lastPoint = aircraft.route[aircraft.route.length - 1];
+    const routeEndSec = Number(lastPoint && lastPoint.time);
+    if (Number.isFinite(routeEndSec) && routeEndSec >= 0) {
+        return formatDateTimeUTC(new Date(startDate.getTime() + routeEndSec * 1000));
+    }
+
+    const speed = Number(aircraft.speed);
+    if (!(Number.isFinite(speed) && speed > 0)) return '-';
+
+    let totalNm = 0;
+    for (let i = 0; i < aircraft.route.length - 1; i++) {
+        const p1 = aircraft.route[i];
+        const p2 = aircraft.route[i + 1];
+        const meters = haversineMeters(p1.lat, p1.lon, p2.lat, p2.lon);
+        totalNm += meters / 1852;
+    }
+    if (totalNm <= 0) return '-';
+
+    const hours = totalNm / speed;
+    return formatDateTimeUTC(new Date(startDate.getTime() + hours * 3600 * 1000));
+}
+
+function createLiveAircraftCard(aircraftId) {
+    const el = document.createElement('div');
+    el.className = 'aircraft-card';
+    el.dataset.aircraftId = aircraftId || '';
+    el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;flex:1;">
+                <div style="flex:1;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="aircraft-color js-card-color" style="width:16px;height:16px;border-radius:50%;border:2px solid white;"></div>
+                        <div class="aircraft-callsign js-card-callsign"></div>
+                    </div>
+                    <div class="js-card-status" style="font-size:11px;color:#95a5a6;"></div>
+                    <div class="altitude-display js-card-altitude-wrap">
+                        <span class="altitude-indicator js-card-vsi">►</span>
+                        <span class="altitude-value js-card-altitude-main">-</span>
+                        <span class="js-card-vsrate" style="font-size:10px;display:none;"></span>
+                    </div>
+                    <div style="font-size:11px;color:#888;margin-top:2px;">
+                        <span><b>Start:</b> <span class="js-card-start">-</span></span><br/>
+                        <span><b>End:</b> <span class="js-card-end">-</span></span>
+                    </div>
+                    <div style="font-size:11px;color:#888;margin-top:2px;">
+                        <span><b>Lat:</b> <span class="js-card-lat">-</span></span>
+                        <span><b>Lon:</b> <span class="js-card-lon">-</span></span><br/>
+                        <span><b>Alt:</b> <span class="js-card-alt">-</span></span>
+                        <span><b>Hdg:</b> <span class="js-card-hdg">-</span></span><br/>
+                        <span><b>Speed:</b> <span class="js-card-speed">-</span></span>
+                    </div>
+                    <div style="font-size:11px;color:#666;margin-top:6px;">
+                        <span><b>Dep:</b> <span class="js-card-dep">-</span></span>
+                        <span style="margin-left:12px;"><b>Arr:</b> <span class="js-card-arr">-</span></span>
+                    </div>
+                </div>
+            </div>
+            <button class="delete-btn js-card-delete" title="Delete">✖</button>
+        </div>
+    `;
+
+    const refs = {
+        el: el,
+        colorEl: el.querySelector('.js-card-color'),
+        callsignEl: el.querySelector('.js-card-callsign'),
+        statusEl: el.querySelector('.js-card-status'),
+        altitudeWrapEl: el.querySelector('.js-card-altitude-wrap'),
+        vsiEl: el.querySelector('.js-card-vsi'),
+        altitudeMainEl: el.querySelector('.js-card-altitude-main'),
+        vsRateEl: el.querySelector('.js-card-vsrate'),
+        startEl: el.querySelector('.js-card-start'),
+        endEl: el.querySelector('.js-card-end'),
+        latEl: el.querySelector('.js-card-lat'),
+        lonEl: el.querySelector('.js-card-lon'),
+        altEl: el.querySelector('.js-card-alt'),
+        hdgEl: el.querySelector('.js-card-hdg'),
+        speedEl: el.querySelector('.js-card-speed'),
+        depEl: el.querySelector('.js-card-dep'),
+        arrEl: el.querySelector('.js-card-arr'),
+        deleteBtn: el.querySelector('.js-card-delete')
+    };
+
+    if (refs.deleteBtn) {
+        refs.deleteBtn.addEventListener('click', () => {
+            const id = refs.el && refs.el.dataset ? refs.el.dataset.aircraftId : '';
+            if (id) deleteAircraft(id);
+        });
+    }
+
+    return refs;
+}
+
+function updateLiveAircraftCard(refs, aircraft) {
+    if (!refs || !aircraft) return;
+
+    refs.el.dataset.aircraftId = aircraft.id || '';
+    if (refs.colorEl) refs.colorEl.style.backgroundColor = aircraft.color || '#666';
+    if (refs.callsignEl) refs.callsignEl.textContent = aircraft.callsign || aircraft.id || 'Unknown';
+    if (refs.statusEl) refs.statusEl.textContent = (aircraft.position && aircraft.position.active) ? 'Active' : 'Waiting';
+
+    const altitude = Number(aircraft.altitude);
+    const verticalSpeed = Number(aircraft.verticalSpeed) || 0;
+    const hasAltitude = Number.isFinite(altitude) && altitude > 0;
+
+    if (refs.altitudeWrapEl) refs.altitudeWrapEl.style.display = hasAltitude ? '' : 'none';
+    if (hasAltitude && refs.altitudeMainEl) refs.altitudeMainEl.textContent = `${formatNumber(altitude)} ft`;
+    if (hasAltitude && refs.vsiEl) {
+        refs.vsiEl.classList.remove('climbing', 'descending', 'level');
+        if (verticalSpeed > 100) {
+            refs.vsiEl.classList.add('climbing');
+            refs.vsiEl.textContent = '▲';
+        } else if (verticalSpeed < -100) {
+            refs.vsiEl.classList.add('descending');
+            refs.vsiEl.textContent = '▼';
+        } else {
+            refs.vsiEl.classList.add('level');
+            refs.vsiEl.textContent = '►';
+        }
+    }
+    if (refs.vsRateEl) {
+        if (hasAltitude && Math.abs(verticalSpeed) > 100) {
+            refs.vsRateEl.style.display = '';
+            refs.vsRateEl.textContent = `(${verticalSpeed > 0 ? '+' : ''}${Math.round(verticalSpeed)} ft/min)`;
+        } else {
+            refs.vsRateEl.style.display = 'none';
+            refs.vsRateEl.textContent = '';
+        }
+    }
+
+    if (refs.startEl) refs.startEl.textContent = formatDateTimeUTC(aircraft.startTime);
+    if (refs.endEl) refs.endEl.textContent = estimateAircraftEndTime(aircraft);
+
+    const lat = aircraft.position ? Number(aircraft.position.lat) : NaN;
+    const lon = aircraft.position ? Number(aircraft.position.lon) : NaN;
+    const hdg = aircraft.position ? Number(aircraft.position.heading) : NaN;
+    const speed = Number(aircraft.speed);
+
+    if (refs.latEl) refs.latEl.textContent = Number.isFinite(lat) ? lat.toFixed(4) : '-';
+    if (refs.lonEl) refs.lonEl.textContent = Number.isFinite(lon) ? lon.toFixed(4) : '-';
+    if (refs.altEl) refs.altEl.textContent = hasAltitude ? `${formatNumber(altitude)} ft` : '-';
+    if (refs.hdgEl) refs.hdgEl.textContent = Number.isFinite(hdg) ? `${Math.round(hdg)}°` : '-';
+    if (refs.speedEl) refs.speedEl.textContent = Number.isFinite(speed) ? `${Math.round(speed)} kts` : '-';
+    if (refs.depEl) refs.depEl.textContent = aircraft.departure || '-';
+    if (refs.arrEl) refs.arrEl.textContent = aircraft.arrival || '-';
 }
 
 // Update aircraft list in info panel
 function updateAircraftList(aircraftArray) {
     const nowMs = Date.now();
-    // Allow forced updates by passing aircraftArray.force = true (or via second arg in callers)
     const forced = (aircraftArray && aircraftArray._force) || false;
     if (!forced && (nowMs - lastAircraftListUpdateMs) < AIRCRAFT_LIST_MIN_UPDATE_MS) return;
     lastAircraftListUpdateMs = nowMs;
+
     const listEl = document.getElementById('aircraftList');
-    
-    // If using simulation-update data
+    if (!listEl) return;
+
+    // Live simulation data path: update cards in-place to avoid flicker.
     if (aircraftArray && Array.isArray(aircraftArray)) {
+        if (aircraftListRenderMode !== 'live') {
+            aircraftListRenderMode = 'live';
+            aircraftListCards = {};
+            listEl.innerHTML = '';
+        }
+
         if (aircraftArray.length === 0) {
+            aircraftListCards = {};
             listEl.innerHTML = '<div class="no-aircraft">No active aircraft</div>';
             return;
         }
-        // Ensure route times are present so start/end estimates work
-        aircraftArray.forEach(a => { try { ensureRouteTimes(a); } catch(e){} });
-        
-        listEl.innerHTML = aircraftArray.map(ac => {
-            const status = ac.position?.active ? '✓ Active' : '○ Waiting';
-            // Determine vertical speed indicator
-            let vspeedIndicator = '→';
-            let vspeedClass = 'level';
-            if (ac.verticalSpeed > 100) {
-                vspeedIndicator = '🔼';
-                vspeedClass = 'climbing';
-            } else if (ac.verticalSpeed < -100) {
-                vspeedIndicator = '🔽';
-                vspeedClass = 'descending';
+
+        if (listEl.querySelector('.no-aircraft')) listEl.innerHTML = '';
+
+        aircraftArray.forEach(a => { try { ensureRouteTimes(a); } catch (e) {} });
+
+        const seenIds = new Set();
+        let insertIndex = 0;
+        aircraftArray.forEach(ac => {
+            if (!ac || !ac.id) return;
+            seenIds.add(ac.id);
+
+            let refs = aircraftListCards[ac.id];
+            if (!refs) {
+                refs = createLiveAircraftCard(ac.id);
+                aircraftListCards[ac.id] = refs;
             }
-            const altitudeDisplay = ac.altitude ? `
-                <div class="altitude-display">
-                    <span class="altitude-indicator ${vspeedClass}">${vspeedIndicator}</span>
-                    <span class="altitude-value">${ac.altitude.toLocaleString()} ft</span>
-                    ${Math.abs(ac.verticalSpeed || 0) > 100 ? 
-                      `<span style="font-size: 10px;">(${ac.verticalSpeed > 0 ? '+' : ''}${ac.verticalSpeed} ft/min)</span>` 
-                      : ''}
-                </div>
-            ` : '';
-            // Format start and end time
-            let startTimeStr = ac.startTime ? new Date(ac.startTime).toLocaleString() : '-';
-            let endTimeStr = '-';
-            if (ac.route && ac.route.length > 1 && ac.startTime) {
-                // If route times are available, use them
-                let lastTime = ac.route[ac.route.length - 1].time;
-                if (typeof lastTime === 'number' && !isNaN(lastTime)) {
-                    let endDate = new Date(new Date(ac.startTime).getTime() + lastTime * 1000);
-                    endTimeStr = endDate.toLocaleString();
-                } else if (ac.speed) {
-                    // Fallback: estimate by distance
-                    let totalNm = 0;
-                    for (let i = 0; i < ac.route.length - 1; i++) {
-                        const p1 = ac.route[i];
-                        const p2 = ac.route[i+1];
-                        const meters = haversineMeters(p1.lat, p1.lon, p2.lat, p2.lon);
-                        totalNm += meters / 1852;
-                    }
-                    let hours = totalNm / ac.speed;
-                    let endDate = new Date(new Date(ac.startTime).getTime() + hours * 3600 * 1000);
-                    endTimeStr = endDate.toLocaleString();
-                }
+
+            updateLiveAircraftCard(refs, ac);
+
+            const existingAtIndex = listEl.children[insertIndex];
+            if (existingAtIndex !== refs.el) {
+                listEl.insertBefore(refs.el, existingAtIndex || null);
             }
-            // Position info
-            let lat = ac.position && typeof ac.position.lat === 'number' ? ac.position.lat.toFixed(4) : '';
-            let lon = ac.position && typeof ac.position.lon === 'number' ? ac.position.lon.toFixed(4) : '';
-            let alt = ac.altitude ? ac.altitude.toLocaleString() : '';
-            let heading = ac.position && typeof ac.position.heading === 'number' ? ac.position.heading.toFixed(0) + '°' : '';
-            return `
-                <div class="aircraft-card">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                                <div style="flex: 1;">
-                                    <div style="display:flex;align-items:center;gap:8px;">
-                                        <div class="aircraft-color" style="background-color: ${ac.color}; width:16px; height:16px; border-radius:50%; border:2px solid white;"></div>
-                                        <div class="aircraft-callsign">${ac.callsign}</div>
-                                    </div>
-                                <div style="font-size: 11px; color: #95a5a6;">${status}</div>
-                                ${altitudeDisplay}
-                                <div style="font-size: 11px; color: #888; margin-top: 2px;">
-                                    <span><b>Start:</b> ${startTimeStr || '-'}</span><br/>
-                                    <span><b>End:</b> ${endTimeStr || '-'}</span>
-                                </div>
-                                <div style="font-size: 11px; color: #888; margin-top: 2px;">
-                                    <span><b>Lat:</b> ${lat}</span> <span><b>Lon:</b> ${lon}</span><br/>
-                                    <span><b>Alt:</b> ${alt} ft</span> <span><b>Hdg:</b> ${heading}</span><br/>
-                                    <span><b>Speed:</b> ${ac.speed ? ac.speed : '-'} kts</span>
-                                </div>
-                                <div style="font-size:11px;color:#666;margin-top:6px;">
-                                    <span><b>Dep:</b> ${ac.departure || '-'} </span>
-                                    <span style="margin-left:12px;"><b>Arr:</b> ${ac.arrival || '-'}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <button class="delete-btn" onclick="deleteAircraft('${ac.id}')" title="Delete">✖</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
+            insertIndex += 1;
+        });
+
+        Object.keys(aircraftListCards).forEach(id => {
+            if (seenIds.has(id)) return;
+            const refs = aircraftListCards[id];
+            if (refs && refs.el && refs.el.parentNode === listEl) refs.el.parentNode.removeChild(refs.el);
+            delete aircraftListCards[id];
+        });
+
+        if (insertIndex === 0) {
+            aircraftListCards = {};
+            listEl.innerHTML = '<div class="no-aircraft">No active aircraft</div>';
+        }
         return;
     }
-    
-    // Original behavior for legacy mission data
+
+    // Legacy mission data path
+    if (aircraftListRenderMode !== 'legacy') {
+        aircraftListRenderMode = 'legacy';
+        aircraftListCards = {};
+    }
+
     if (!missionData || !missionData.aircraft) {
         listEl.innerHTML = '<p>No aircraft data available</p>';
         return;
     }
-    
+
     listEl.innerHTML = missionData.aircraft.map(aircraft => {
         const currentPos = getCurrentPosition(aircraft, currentTime);
         return `
@@ -832,7 +849,7 @@ function updateAircraftList(aircraftArray) {
                     <span class="label">Speed:</span>
                     <span class="value">${aircraft.speed || '-'} kts</span>
                     <span class="label">Status:</span>
-                    <span class="value">${currentTime >= getMaxTime(aircraft) ? '✅ Complete' : '▲ In Flight'}</span>
+                    <span class="value">${currentTime >= getMaxTime(aircraft) ? 'Complete' : 'In Flight'}</span>
                     <div style="font-size:11px;color:#666;margin-top:6px;">
                         <span><b>Dep:</b> ${aircraft.departure || '-'}</span>
                         <span style="margin-left:12px;"><b>Arr:</b> ${aircraft.arrival || '-'}</span>
@@ -889,19 +906,9 @@ function play() {
     document.getElementById('playBtn').disabled = true;
     document.getElementById('pauseBtn').disabled = false;
     
-    // Advance time in 1s ticks so slider (1s step) and play remain aligned
+    // Advance time in 1s ticks
     animationInterval = setInterval(() => {
         currentTime += 1 * playbackSpeed;
-        // Reflect time on the scrubber (slider holds seconds-since-midnight)
-        try {
-            const ts = document.getElementById('timeSlider');
-            const tv = document.getElementById('timeValue');
-            const dayStartSec = DAY_START_HOUR * 3600;
-            if (ts && !isScrubbing) ts.value = String(dayStartSec + Math.round(currentTime));
-            if (tv) tv.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
-        } catch (e) {
-            // ignore
-        }
 
         // Stop if mission route completed or we've passed the configured day end
         const maxTime = Math.max(...missionData.aircraft.map(getMaxTime));
@@ -912,7 +919,7 @@ function play() {
         
         updateAircraftPositions();
         updateTimeDisplay();
-        if (!isScrubbing) updateAircraftList();
+        updateAircraftList();
     }, 1000);
 }
 
@@ -934,14 +941,111 @@ function reset() {
     currentTime = 0;
     updateAircraftPositions();
     updateTimeDisplay();
-                updateAircraftList({ _force: true });
+    updateAircraftList({ _force: true });
+}
+
+function buildAircraftPopupContent(aircraft) {
+    return `
+        <div class="aircraft-popup">
+          <div class="popup-header" style="background-color: ${aircraft.color}">
+            <strong class="js-popup-callsign">${aircraft.callsign}</strong>
+          </div>
+          <div class="popup-body">
+            <div class="popup-row">
+              <span class="popup-label">Altitude:</span>
+              <span class="popup-value js-popup-altitude">${formatNumber(aircraft.altitude || 0)} ft</span>
+            </div>
+            <div class="popup-row">
+              <span class="popup-label">Speed:</span>
+              <span class="popup-value js-popup-speed">${aircraft.speed || 0} kts</span>
+            </div>
+            <div class="popup-row">
+              <span class="popup-label">Heading:</span>
+              <span class="popup-value js-popup-heading">${aircraft.heading || 0}°</span>
+            </div>
+            <div class="popup-row js-popup-from-row" style="${aircraft.departure ? '' : 'display:none;'}">
+              <span class="popup-label">From:</span>
+              <span class="popup-value js-popup-from">${aircraft.departure || ''}</span>
+            </div>
+            <div class="popup-row js-popup-to-row" style="${aircraft.arrival ? '' : 'display:none;'}">
+              <span class="popup-label">To:</span>
+              <span class="popup-value js-popup-to">${aircraft.arrival || ''}</span>
+            </div>
+          </div>
+        </div>
+    `;
+}
+
+function updateAircraftPopupDom(marker, aircraft) {
     try {
-        const ts = document.getElementById('timeSlider');
-        const tv = document.getElementById('timeValue');
-        const dayStartSec = DAY_START_HOUR * 3600;
-        if (ts) ts.value = String(dayStartSec + Math.round(currentTime));
-        if (tv) tv.textContent = formatTimeOfDay(dayStartSec + Math.round(currentTime));
-    } catch (e) {}
+        const popup = marker && marker.getPopup && marker.getPopup();
+        if (!popup) return false;
+
+        const popupEl = popup.getElement && popup.getElement();
+        if (!popupEl) return false;
+
+        const callsignEl = popupEl.querySelector('.js-popup-callsign');
+        const altitudeEl = popupEl.querySelector('.js-popup-altitude');
+        const speedEl = popupEl.querySelector('.js-popup-speed');
+        const headingEl = popupEl.querySelector('.js-popup-heading');
+        const fromRow = popupEl.querySelector('.js-popup-from-row');
+        const fromEl = popupEl.querySelector('.js-popup-from');
+        const toRow = popupEl.querySelector('.js-popup-to-row');
+        const toEl = popupEl.querySelector('.js-popup-to');
+        const headerEl = popupEl.querySelector('.popup-header');
+
+        if (callsignEl) callsignEl.textContent = aircraft.callsign || '';
+        if (altitudeEl) altitudeEl.textContent = `${formatNumber(aircraft.altitude || 0)} ft`;
+        if (speedEl) speedEl.textContent = `${aircraft.speed || 0} kts`;
+        if (headingEl) headingEl.textContent = `${aircraft.heading || 0}°`;
+        if (headerEl && aircraft.color) headerEl.style.backgroundColor = aircraft.color;
+
+        if (fromRow) fromRow.style.display = aircraft.departure ? '' : 'none';
+        if (fromEl) fromEl.textContent = aircraft.departure || '';
+        if (toRow) toRow.style.display = aircraft.arrival ? '' : 'none';
+        if (toEl) toEl.textContent = aircraft.arrival || '';
+
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function buildLegacyPopupContent(aircraft, pos) {
+    return `
+        <div class="popup-aircraft-info">
+            <h4 class="js-legacy-callsign">${aircraft.callsign}</h4>
+            <p><strong>Type:</strong> <span class="js-legacy-type">${aircraft.type}</span></p>
+            <p><strong>Altitude:</strong> <span class="js-legacy-alt">${formatNumber(pos.alt)} ft</span></p>
+            <p><strong>Position:</strong> <span class="js-legacy-pos">${pos.lat.toFixed(4)}, ${pos.lon.toFixed(4)}</span></p>
+            <p><strong>Time:</strong> <span class="js-legacy-time">${currentTime.toFixed(1)}s</span></p>
+        </div>
+    `;
+}
+
+function updateLegacyPopupDom(marker, aircraft, pos) {
+    try {
+        const popup = marker && marker.getPopup && marker.getPopup();
+        if (!popup) return false;
+        const popupEl = popup.getElement && popup.getElement();
+        if (!popupEl) return false;
+
+        const callsignEl = popupEl.querySelector('.js-legacy-callsign');
+        const typeEl = popupEl.querySelector('.js-legacy-type');
+        const altEl = popupEl.querySelector('.js-legacy-alt');
+        const posEl = popupEl.querySelector('.js-legacy-pos');
+        const timeEl = popupEl.querySelector('.js-legacy-time');
+
+        if (callsignEl) callsignEl.textContent = aircraft.callsign || '';
+        if (typeEl) typeEl.textContent = aircraft.type || 'Custom';
+        if (altEl) altEl.textContent = `${formatNumber(pos.alt)} ft`;
+        if (posEl) posEl.textContent = `${pos.lat.toFixed(4)}, ${pos.lon.toFixed(4)}`;
+        if (timeEl) timeEl.textContent = `${currentTime.toFixed(1)}s`;
+
+        return true;
+    } catch (e) {
+        return false;
+    }
 }
 
 // Update aircraft positions on map
@@ -988,42 +1092,7 @@ function updateAircraftPositions(aircraftData) {
 
                 const marker = L.marker([lat, lon], { icon: icon }).addTo(map);
 
-                // Create popup content
-                const popupContent = `
-                    <div class="aircraft-popup">
-                      <div class="popup-header" style="background-color: ${aircraft.color}">
-                        <strong>${aircraft.callsign}</strong>
-                      </div>
-                      <div class="popup-body">
-                        <div class="popup-row">
-                          <span class="popup-label">Altitude:</span>
-                          <span class="popup-value">${aircraft.altitude?.toLocaleString() || 0} ft</span>
-                        </div>
-                        <div class="popup-row">
-                          <span class="popup-label">Speed:</span>
-                          <span class="popup-value">${aircraft.speed || 0} kts</span>
-                        </div>
-                        <div class="popup-row">
-                          <span class="popup-label">Heading:</span>
-                          <span class="popup-value">${aircraft.heading || 0}°</span>
-                        </div>
-                        ${aircraft.departure ? `
-                        <div class="popup-row">
-                          <span class="popup-label">From:</span>
-                          <span class="popup-value">${aircraft.departure}</span>
-                        </div>
-                        ` : ''}
-                        ${aircraft.arrival ? `
-                        <div class="popup-row">
-                          <span class="popup-label">To:</span>
-                          <span class="popup-value">${aircraft.arrival}</span>
-                        </div>
-                        ` : ''}
-                      </div>
-                    </div>
-                `;
-
-                marker.bindPopup(popupContent);
+                marker.bindPopup(buildAircraftPopupContent(aircraft));
                 marker.on('click', () => marker.openPopup());
 
                 aircraftMarkers[key] = marker;
@@ -1091,42 +1160,9 @@ function updateAircraftPositions(aircraftData) {
                                     }
                                 } catch (e) {}
 
-                // Update popup content
-                const popupContent = `
-                    <div class="aircraft-popup">
-                      <div class="popup-header" style="background-color: ${aircraft.color}">
-                        <strong>${aircraft.callsign}</strong>
-                      </div>
-                      <div class="popup-body">
-                        <div class="popup-row">
-                          <span class="popup-label">Altitude:</span>
-                          <span class="popup-value">${aircraft.altitude?.toLocaleString() || 0} ft</span>
-                        </div>
-                        <div class="popup-row">
-                          <span class="popup-label">Speed:</span>
-                          <span class="popup-value">${aircraft.speed || 0} kts</span>
-                        </div>
-                        <div class="popup-row">
-                          <span class="popup-label">Heading:</span>
-                          <span class="popup-value">${aircraft.heading || 0}°</span>
-                        </div>
-                        ${aircraft.departure ? `
-                        <div class="popup-row">
-                          <span class="popup-label">From:</span>
-                          <span class="popup-value">${aircraft.departure}</span>
-                        </div>
-                        ` : ''}
-                        ${aircraft.arrival ? `
-                        <div class="popup-row">
-                          <span class="popup-label">To:</span>
-                          <span class="popup-value">${aircraft.arrival}</span>
-                        </div>
-                        ` : ''}
-                      </div>
-                    </div>
-                `;
-
-                aircraftMarkers[key].setPopupContent(popupContent);
+                if (!updateAircraftPopupDom(aircraftMarkers[key], aircraft)) {
+                    aircraftMarkers[key].setPopupContent(buildAircraftPopupContent(aircraft));
+                }
             }
         });
         return;
@@ -1144,7 +1180,9 @@ function updateAircraftPositions(aircraftData) {
             const nowMs = Date.now();
             const lastServerMs = lastServerUpdateMs[aircraft.id] || 0;
             if (lastServerMs && (nowMs - lastServerMs) < SERVER_IGNORE_WINDOW_MS) {
-                // Skip updating this marker — server position is fresher
+                // Skip all legacy updates for this aircraft while server data is fresh.
+                // This prevents popup content flicker from competing update paths.
+                return;
             } else {
                 marker.setLatLng([pos.lat, pos.lon]);
                 // Try updating marker DOM in-place (non-destructive)
@@ -1155,15 +1193,9 @@ function updateAircraftPositions(aircraftData) {
                     altDisplay: `FL${String(Math.round(pos.alt/100)).padStart(3,'0')}`
                 }, '');
             }
-            marker.setPopupContent(`
-                <div class="popup-aircraft-info">
-                    <h4>${aircraft.callsign}</h4>
-                    <p><strong>Type:</strong> ${aircraft.type}</p>
-                    <p><strong>Altitude:</strong> ${pos.alt} ft</p>
-                    <p><strong>Position:</strong> ${pos.lat.toFixed(4)}, ${pos.lon.toFixed(4)}</p>
-                    <p><strong>Time:</strong> ${currentTime.toFixed(1)}s</p>
-                </div>
-            `);
+            if (!updateLegacyPopupDom(marker, aircraft, pos)) {
+                marker.setPopupContent(buildLegacyPopupContent(aircraft, pos));
+            }
         }
     });
 }
@@ -1171,7 +1203,7 @@ function updateAircraftPositions(aircraftData) {
 // Update time display
 function updateTimeDisplay(time) {
     const displayEl = document.getElementById('timeDisplay');
-    if (time) {
+    if (time !== undefined && time !== null) {
         try {
             // Accept ISO string, Date, or numeric seconds-since-midnight
             if (typeof time === 'number') {
@@ -1201,64 +1233,6 @@ function updateTimeDisplay(time) {
         const dayStartSec = DAY_START_HOUR * 3600;
         displayEl.textContent = `Time: ${formatTimeOfDay(dayStartSec + Math.round(currentTime))}`;
     }
-}
-
-// Update lightweight preview markers for a given mission-relative time
-function updatePreviewPositions(time) {
-    if (!missionData || !missionData.aircraft || !previewLayer) return;
-    try {
-        missionData.aircraft.forEach(ac => {
-            try {
-                const pos = getCurrentPosition(ac, time);
-                const key = ac.id;
-                let pm = previewMarkers[key];
-                if (!pm) {
-                    pm = L.circleMarker([pos.lat, pos.lon], {
-                        radius: 4,
-                        color: ac.color || '#333',
-                        weight: 1,
-                        fillColor: ac.color || '#333',
-                        fillOpacity: 0.9,
-                        interactive: false
-                    }).addTo(previewLayer);
-                    previewMarkers[key] = pm;
-                } else {
-                    pm.setLatLng([pos.lat, pos.lon]);
-                }
-            } catch (e) {}
-        });
-    } catch (e) {}
-}
-
-function clearPreviewMarkers() {
-    try {
-        if (previewLayer) previewLayer.clearLayers();
-    } catch (e) {}
-    previewMarkers = {};
-}
-
-function hideMainMarkers() {
-    try {
-        Object.keys(aircraftMarkers).forEach(k => {
-            try {
-                const m = aircraftMarkers[k];
-                const el = m && m.getElement && m.getElement();
-                if (el) el.style.display = 'none';
-            } catch (e) {}
-        });
-    } catch (e) {}
-}
-
-function showMainMarkers() {
-    try {
-        Object.keys(aircraftMarkers).forEach(k => {
-            try {
-                const m = aircraftMarkers[k];
-                const el = m && m.getElement && m.getElement();
-                if (el) el.style.display = '';
-            } catch (e) {}
-        });
-    } catch (e) {}
 }
 
 // Try to update a marker's inner DOM when it becomes available.
@@ -1417,54 +1391,7 @@ function formatTime(seconds) {
 
 // Update aircraft display with altitude info
 function updateAircraftDisplay(aircraft) {
-    const listEl = document.getElementById('aircraftList');
-    if (!listEl) return;
-    
-    if (aircraft.length === 0) {
-        listEl.innerHTML = '<div class="no-aircraft">No active aircraft</div>';
-        return;
-    }
-    
-    listEl.innerHTML = aircraft.map(ac => {
-        const status = ac.position?.active ? '✓ Active' : '○ Waiting';
-        
-        // Determine vertical speed indicator
-        let vspeedIndicator = '→';
-        let vspeedClass = 'level';
-        if (ac.verticalSpeed > 100) {
-            vspeedIndicator = '🔼';
-            vspeedClass = 'climbing';
-        } else if (ac.verticalSpeed < -100) {
-            vspeedIndicator = '🔽';
-            vspeedClass = 'descending';
-        }
-        
-        const altitudeDisplay = ac.altitude ? `
-            <div class="altitude-display">
-                <span class="altitude-indicator ${vspeedClass}">${vspeedIndicator}</span>
-                <span class="altitude-value">${ac.altitude.toLocaleString()} ft</span>
-                ${Math.abs(ac.verticalSpeed || 0) > 100 ? 
-                  `<span style="font-size: 10px;">(${ac.verticalSpeed > 0 ? '+' : ''}${ac.verticalSpeed} ft/min)</span>` 
-                  : ''}
-            </div>
-        ` : '';
-        
-        return `
-            <div class="aircraft-card">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                        <div class="aircraft-marker" style="background-color: ${ac.color}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #333;"></div>
-                        <div style="flex: 1;">
-                            <div style="font-weight: bold;">${ac.callsign}</div>
-                            <div style="font-size: 11px; color: #95a5a6;">${status}</div>
-                            ${altitudeDisplay}
-                        </div>
-                    </div>
-                    <button class="btn btn-danger btn-small" onclick="deleteAircraft('${ac.id}')">🗑️</button>
-                </div>
-            </div>
-        `;
-    }).join('');
+    updateAircraftList(Array.isArray(aircraft) ? aircraft : []);
 }
 
 // ============================================
